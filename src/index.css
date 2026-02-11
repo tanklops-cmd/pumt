@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-50 text-corrections-charcoal antialiased;
+}
+
+@layer components {
+  .btn-corrections {
+    @apply bg-corrections-blue text-white px-4 py-2 rounded-lg font-medium hover:bg-corrections-blue-dark transition;
+  }
+  .btn-outline {
+    @apply border-2 border-corrections-blue text-corrections-blue px-4 py-2 rounded-lg font-medium hover:bg-corrections-blue-pale transition;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden;
+  }
+}

@@ -69,7 +69,7 @@ export function generateMockPrisoners(): Prisoner[] {
       const cell = `${block}-${cellNum}`
 
       const security = pick(SECURITY_OPTIONS, SECURITY_WEIGHTS)
-      const job = pick(JOBS, JOB_WEIGHTS)
+      const job = pick([...JOBS], JOB_WEIGHTS)
       const notes = pick(NOTES_OPTIONS)
       const ops = Math.random() < 0.12
       const ccs = Math.random() < 0.15

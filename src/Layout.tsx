@@ -1,10 +1,18 @@
 import { Link, useLocation } from 'react-router-dom'
-import { UNITS } from './constants'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const loc = useLocation()
   const isHome = loc.pathname === '/'
   const isAdmin = loc.pathname.startsWith('/admin')
+  const role = typeof window !== 'undefined' ? sessionStorage.getItem('auth_role') : null
+
+  const logout = () => {
+    sessionStorage.removeItem('auth_token')
+    sessionStorage.removeItem('auth_role')
+    // if admin fallback session used
+    try { sessionStorage.removeItem('prison-muster-admin-ok') } catch {}
+    window.location.reload()
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -27,6 +35,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             >
               Admin
             </Link>
+            {(role === 'pco' || role === 'admin') && (
+              <Link to="/pco" className="px-3 py-1.5 rounded hover:bg-white/10">PCO</Link>
+            )}
+            {role ? (
+              <button onClick={logout} className="px-3 py-1.5 rounded hover:bg-white/10">Sign out</button>
+            ) : (
+              <Link to="/login" className="px-3 py-1.5 rounded hover:bg-white/10">Sign in</Link>
+            )}
           </nav>
         </div>
       </header>

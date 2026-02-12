@@ -2,13 +2,12 @@ import { Link, useParams } from 'react-router-dom'
 import Layout from '../Layout'
 import { getUnitsForPrison, PRISONS } from '../constants'
 import { initializeTemplateHubsForPrison } from '../store'
-import { exportPrisonData } from '../store'
 
 export default function UnitSelection() {
   const { prisonId } = useParams<{ prisonId: string }>()
-  const prison = PRISONS.find((p) => p.id === prisonId) ?? { id: prisonId, name: prisonId }
+  const prison = PRISONS.find((p) => p.id === prisonId) ?? { id: prisonId, name: prisonId, shortName: prisonId }
 
-  const units = getUnitsForPrison(prison.id)
+  const units = getUnitsForPrison(prison.id as string)
 
   return (
     <Layout>
@@ -21,7 +20,7 @@ export default function UnitSelection() {
             className="btn btn-secondary"
             onClick={() => {
               if (!window.confirm(`Initialize template hubs for ${prison.name}? This will create today's tasks and save snapshots for all units.`)) return
-              const ids = initializeTemplateHubsForPrison(prison.id)
+              const ids = initializeTemplateHubsForPrison(prison.id as string)
               alert(`Initialized ${ids.length} units for ${prison.name}`)
               // refresh page to reflect newly created tasks/snapshots
               window.location.reload()
@@ -29,28 +28,7 @@ export default function UnitSelection() {
           >
             Initialize template hubs for this prison
           </button>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={() => {
-              try {
-                const json = exportPrisonData(prison.id)
-                const blob = new Blob([json], { type: 'application/json' })
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `${prison.id}-export-${new Date().toISOString().slice(0,10)}.json`
-                document.body.appendChild(a)
-                a.click()
-                a.remove()
-                URL.revokeObjectURL(url)
-              } catch (e) {
-                alert('Failed to export prison data')
-              }
-            }}
-          >
-            Export prison data (JSON)
-          </button>
+          {/* Export removed: snapshots are saved to backend/audit trail */}
           <Link to={`/prison/${prison.id}/control`} className="btn btn-outline">Open Control Hub for {prison.shortName ?? prison.name}</Link>
         </div>
       </div>

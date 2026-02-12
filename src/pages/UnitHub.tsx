@@ -19,6 +19,7 @@ import {
   setStripSearch,
   getPrisoners,
 } from '../store'
+import { getAuditEntries } from '../store'
 import { addAuditEntry } from '../store'
 import { openPrintWindow, buildHandoverPrintHtml } from '../printUtils'
 
@@ -318,7 +319,69 @@ export default function UnitHub() {
             )}
           </div>
         </section>
+        {/* Movement log (unit) — placed under weekly cell alarms */}
+        <section className="card lg:col-span-2">
+          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">Movement log (unit)</div>
+          <div className="p-4">
+            <p className="text-xs text-slate-500 mb-3">Recent movement and location updates for this unit.</p>
+            <UnitMovementList unitId={id} />
+          </div>
+        </section>
       </div>
     </Layout>
   )
+}
+
+function UnitMovementList({ unitId }: { unitId: string }) {
+  const [entries, setEntries] = useState(() => getAuditEntries().filter((e) => e.unitId === unitId && isMovementAction(e.action)))
+
+  useEffect(() => {
+    let sub: { close: () => void } | null = null
+    const refreshFromStorage = () => setEntries(getAuditEntries().filter((e) => e.unitId === unitId && isMovementAction(e.action)))
+    window.addEventListener('storage', refreshFromStorage)
+
+    ;(async () => {
+      try {
+        const { subscribeAudit } = await import('../ws')
+        sub = subscribeAudit((entry) => {
+          if (entry.unitId === unitId && isMovementAction(entry.action)) {
+            setEntries((prev) => [entry, ...prev].slice(0, 200))
+          }
+        }, () => {})
+      } catch (e) {
+        // no ws available, rely on storage events
+      }
+    })()
+
+    return () => {
+      window.removeEventListener('storage', refreshFromStorage)
+      sub?.close()
+    }
+  }, [unitId])
+
+  return (
+    <div>
+      {entries.length === 0 ? (
+        <div className="text-sm text-slate-500">No recent movement entries for this unit.</div>
+      ) : (
+        <ul className="text-sm space-y-2 max-h-48 overflow-y-auto">
+          {entries.map((e) => (
+            <li key={e.id} className="flex items-start justify-between">
+              <div>
+                <div className="font-medium">{e.action}</div>
+                <div className="text-xs text-slate-500">{e.detail ?? '—'}</div>
+              </div>
+              <div className="text-xs text-slate-400 whitespace-nowrap">{new Date(e.timestamp).toLocaleTimeString()}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function isMovementAction(a?: string) {
+  if (!a) return false
+  const s = a.toLowerCase()
+  return s.includes('move') || s.includes('moved') || s.includes('location')
 }

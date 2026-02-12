@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Layout from '../Layout'
-import { getAllUnitsSummary, getUnitsSummaryForPrison, getControlHandover, setControlHandover, resetDailyTasksForDate, resetDailyTasksForPrison, getPrisoners } from '../store'
+import { getAllUnitsSummary, getUnitsSummaryForPrison, getControlHandover, setControlHandover, resetDailyTasksForDate, resetDailyTasksForPrison, getPrisoners, getAllPrisoners, unitsWithIncompleteTasksForPrison, unitsWithIncompleteTasksForAll } from '../store'
 import { PRISONS } from '../constants'
 import type { Prisoner } from '../types'
 
@@ -16,6 +16,8 @@ export default function ControlHub() {
   const [handover, setHandover] = useState(() => getControlHandover(today()))
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const [prisonersByUnit, setPrisonersByUnit] = useState<Record<string, Prisoner[]>>({})
+  const [quickLookupQuery, setQuickLookupQuery] = useState('')
+  const [quickLookupResults, setQuickLookupResults] = useState<Prisoner[]>([])
 
   const LOCATION_LABELS: Record<string, string> = {
     CELL: 'Cell',
@@ -47,10 +49,10 @@ export default function ControlHub() {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
-  const saveHandoverField = (field: keyof typeof handover, value: string) => {
+  const saveHandoverField = (field: 'general' | 'visits' | 'other', value: string) => {
     const next = { ...(handover || {}), [field]: value }
     setHandover(next)
-    setControlHandover(today(), { general: next.general, visits: next.visits, other: next.other })
+    setControlHandover(today(), { ...(field === 'general' ? { general: value } : {}), ...(field === 'visits' ? { visits: value } : {}), ...(field === 'other' ? { other: value } : {}) })
   }
 
   const handleResetTasks = () => {
@@ -65,6 +67,14 @@ export default function ControlHub() {
     }
     alert('Reset for new day completed.')
   }
+
+  // incomplete tasks list
+  const [incompleteUnits, setIncompleteUnits] = useState<{ unitId: string; incomplete: number }[]>([])
+
+  useEffect(() => {
+    const d = today()
+    setIncompleteUnits(prisonId ? unitsWithIncompleteTasksForPrison(prisonId, d) : unitsWithIncompleteTasksForAll(d))
+  }, [summary, prisonId])
 
   const toggleExpand = (unitId: string) => {
     setExpanded((s) => {
@@ -84,6 +94,9 @@ export default function ControlHub() {
           <Link to={prisonId ? `/prison/${prisonId}` : '/'} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {prisonId ? 'Back to units' : 'Unit selection'}</Link>
           <h1 className="text-2xl font-bold text-corrections-charcoal">{prison ? `${prison.name} — Control Hub` : 'Control Hub'}</h1>
           <p className="text-sm text-slate-600">{prison ? 'Prison-level overview, handover and task controls.' : 'Facility-wide overview, global handover and task controls.'}</p>
+        </div>
+        <div>
+          <Link to={prisonId ? `/prison/${prisonId}/sco` : '/sco'} className="btn-outline">Open SCO Hub</Link>
         </div>
       </div>
 
@@ -133,6 +146,59 @@ export default function ControlHub() {
                       <button type="button" onClick={() => setSummary(prisonId ? getUnitsSummaryForPrison(prisonId) : getAllUnitsSummary())} className="btn-outline mr-2">Refresh</button>
                       <button type="button" onClick={handleResetTasks} className="btn-corrections">Reset for New Day</button>
                     </div>
+                    <div className="mt-4">
+                      <div className="text-xs text-slate-500 mb-2">Units with incomplete daily tasks</div>
+                      {incompleteUnits.length === 0 ? (
+                        <div className="text-sm text-slate-500">All units have completed tasks.</div>
+                      ) : (
+                        <ul className="text-sm space-y-1">
+                          {incompleteUnits.map((u) => (
+                            <li key={u.unitId} className="flex items-center justify-between">
+                              <div className="capitalize">{u.unitId}</div>
+                              <div className="text-slate-600">{u.incomplete} incomplete</div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                      <div className="mt-4">
+                        <div className="text-xs text-slate-500 mb-2">Quick person lookup</div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Name or ID"
+                            value={quickLookupQuery}
+                            onChange={(e) => setQuickLookupQuery(e.target.value)}
+                            className="flex-1 border rounded px-2 py-1 text-sm"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const q = quickLookupQuery.trim().toLowerCase()
+                              if (!q) { setQuickLookupResults([]); return }
+                              const all = getAllPrisoners()
+                              const matches = all.filter((p) => (p.name ?? '').toLowerCase().includes(q) || (p.id ?? '').toLowerCase().includes(q))
+                              setQuickLookupResults(matches.slice(0, 10))
+                            }}
+                            className="btn-outline text-sm"
+                          >Find</button>
+                        </div>
+                        {quickLookupResults.length > 0 && (
+                          <ul className="mt-2 text-sm space-y-1 max-h-36 overflow-y-auto">
+                            {quickLookupResults.map((p) => (
+                              <li key={p.id} className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium">{p.name || 'Unnamed'}</div>
+                                  <div className="text-xs text-slate-500">{p.id} — {p.cell || '—'} — {p.unitId}</div>
+                                </div>
+                                <div>
+                                  <Link to={prisonId ? `/prison/${prisonId}/unit/${p.unitId}` : `/unit/${p.unitId}`} className="text-corrections-blue hover:underline text-sm">Open</Link>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
           </div>
         </section>
 

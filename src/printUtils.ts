@@ -13,7 +13,7 @@ export function openPrintWindow(html: string, title: string): void {
   w.focus()
   w.onload = () => {
     w.print()
-    w.afterprint = () => w.close()
+    w.onafterprint = () => w.close()
   }
 }
 

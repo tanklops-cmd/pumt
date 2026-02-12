@@ -127,7 +127,7 @@ export default function AdminHub() {
         <div className="p-4 border-b">
           <h3 className="font-semibold mb-2">Review unit hub snapshot</h3>
           <div className="flex gap-2 items-center">
-            <select value={selectedUnit} onChange={(e) => { setSelectedUnit(e.target.value); setAvailableSnapshots(listHubSnapshots(e.target.value)) }} className="border rounded p-2">
+            <select value={selectedUnit} onChange={(e) => { setSelectedUnit(e.target.value as any); setAvailableSnapshots(listHubSnapshots(e.target.value as any)) }} className="border rounded p-2">
               {UNITS.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
             <select onChange={(e) => loadSnapshot(selectedUnit, e.target.value)} className="border rounded p-2">

@@ -47,6 +47,17 @@ export function getPrisoners(unitId: UnitId): Prisoner[] {
   }
 }
 
+export function getAllPrisoners(): Prisoner[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.prisoners)
+    if (!raw) return []
+    const all: Prisoner[] = JSON.parse(raw)
+    return all
+  } catch {
+    return []
+  }
+}
+
 export function setPrisoners(unitId: UnitId, prisoners: Prisoner[]): void {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.prisoners)
@@ -141,7 +152,7 @@ export function ensureDailyTasks(unitId: UnitId, date: string): DailyTask[] {
       id: `task-${unitId}-${date}-${i}`,
       label,
       done: false,
-      unitId,
+        unitId: unitId as any,
       date,
     }))
     const raw = localStorage.getItem(STORAGE_KEYS.dailyTasks)
@@ -268,6 +279,29 @@ export function generateSearches(unitId: UnitId, date: string, cells: string[]):
   return targets
 }
 
+// ——— Clear / reset search targets ———
+export function clearSearchTargetsForUnitDate(unitId: UnitId, date: string): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.searchTargets)
+    const all: SearchTarget[] = raw ? JSON.parse(raw) : []
+    const rest = all.filter((s) => !(s.unitId === unitId && s.date === date))
+    localStorage.setItem(STORAGE_KEYS.searchTargets, JSON.stringify(rest))
+  } catch (e) {
+    console.error('Failed clearing search targets', e)
+  }
+}
+
+export function clearSearchTargetsForDate(date: string): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.searchTargets)
+    const all: SearchTarget[] = raw ? JSON.parse(raw) : []
+    const rest = all.filter((s) => s.date !== date)
+    localStorage.setItem(STORAGE_KEYS.searchTargets, JSON.stringify(rest))
+  } catch (e) {
+    console.error('Failed clearing search targets for date', e)
+  }
+}
+
 // ——— Strip search ———
 export function getStripSearch(unitId: UnitId, date: string): StripSearchRecord | null {
   try {
@@ -341,7 +375,7 @@ export function getUnitMusterSummary(unitId: UnitId) {
 
 export function getAllUnitsSummary() {
   try {
-    const summaries = UNITS.map((u) => getUnitMusterSummary(u.id))
+    const summaries = UNITS.map((u) => getUnitMusterSummary(u.id as any))
     const total = summaries.reduce((s, cur) => s + (cur.total ?? 0), 0)
     const offSite = summaries.reduce((s, cur) => s + (cur.offSite ?? 0), 0)
     return { summaries, total, offSite }
@@ -354,7 +388,7 @@ export function getAllUnitsSummary() {
 export function getUnitsSummaryForPrison(prisonId: string) {
   try {
     const units = getUnitsForPrison(prisonId)
-    const summaries = units.map((u) => getUnitMusterSummary(u.id))
+    const summaries = units.map((u) => getUnitMusterSummary(u.id as any))
     const total = summaries.reduce((s, cur) => s + (cur.total ?? 0), 0)
     const offSite = summaries.reduce((s, cur) => s + (cur.offSite ?? 0), 0)
     return { summaries, total, offSite }
@@ -363,12 +397,38 @@ export function getUnitsSummaryForPrison(prisonId: string) {
   }
 }
 
+export function countIncompleteDailyTasks(unitId: UnitId, date: string): number {
+  try {
+    const tasks = getDailyTasks(unitId, date)
+    return tasks.filter((t) => !t.done).length
+  } catch {
+    return 0
+  }
+}
+
+export function unitsWithIncompleteTasksForPrison(prisonId: string, date: string) {
+  try {
+    const units = getUnitsForPrison(prisonId)
+    return units.map((u) => ({ unitId: u.id, incomplete: countIncompleteDailyTasks(u.id as any, date) })).filter((x) => x.incomplete > 0)
+  } catch {
+    return []
+  }
+}
+
+export function unitsWithIncompleteTasksForAll(date: string) {
+  try {
+    return UNITS.map((u) => ({ unitId: u.id, incomplete: countIncompleteDailyTasks(u.id as any, date) })).filter((x) => x.incomplete > 0)
+  } catch {
+    return []
+  }
+}
+
 /** Reset daily tasks only for units belonging to a given prison (does NOT touch handover). */
 export function resetDailyTasksForPrison(prisonId: string, date: string) {
   try {
     const units = getUnitsForPrison(prisonId)
     for (const u of units) {
-      saveHubSnapshot(u.id, date)
+      saveHubSnapshot(u.id as any, date)
     }
     const raw = localStorage.getItem(STORAGE_KEYS.dailyTasks)
     const all: DailyTask[] = raw ? JSON.parse(raw) : []
@@ -387,6 +447,24 @@ export function resetDailyTasksForPrison(prisonId: string, date: string) {
       localStorage.setItem(STORAGE_KEYS.prisoners, JSON.stringify(nextPrisoners))
     } catch (e) {
       console.error('Failed resetting prisoners for prison', e)
+    }
+
+    // Clear muster confirmations for these units for the date
+    try {
+      for (const u of units) {
+        setMusterConfirmation(u.id as any, date, { unlock: false, random: false, lockup: false })
+      }
+    } catch (e) {
+      console.error('Failed clearing muster confirmations for prison reset', e)
+    }
+
+    // Clear generated daily searches for these units for the date
+    try {
+      for (const u of units) {
+        clearSearchTargetsForUnitDate(u.id as any, date)
+      }
+    } catch (e) {
+      console.error('Failed clearing search targets for prison reset', e)
     }
 
     addAuditEntry({ action: 'Daily tasks reset (prison)', detail: `Reset tasks, prisoner locations and meals for ${prisonId} ${date}` })
@@ -442,7 +520,8 @@ export function getControlHandover(date: string) {
     const raw = localStorage.getItem(STORAGE_KEYS.controlHandover)
     if (!raw) return { date }
     const byDate: Record<string, { general?: string; visits?: string; other?: string }> = JSON.parse(raw)
-    return byDate[date] ?? { date }
+    const result = byDate[date] ?? {}
+    return { date, general: result.general, visits: result.visits, other: result.other }
   } catch {
     return { date }
   }
@@ -533,6 +612,23 @@ export function resetDailyTasksForDate(date: string) {
       console.error('Failed resetting prisoners', e)
     }
 
+    // Clear muster confirmations for all units for the date
+    try {
+      const units = UNITS
+      for (const u of units) {
+        setMusterConfirmation(u.id as any, date, { unlock: false, random: false, lockup: false })
+      }
+    } catch (e) {
+      console.error('Failed clearing muster confirmations for date reset', e)
+    }
+
+    // Clear generated daily searches for the date across all units
+    try {
+      clearSearchTargetsForDate(date)
+    } catch (e) {
+      console.error('Failed clearing search targets for date reset', e)
+    }
+
     addAuditEntry({ action: 'Daily tasks reset', detail: `Reset tasks, prisoner locations and meals for ${date}` })
   } catch (e) {
     console.error(e)
@@ -560,7 +656,7 @@ export function initializeTemplateHubsForPrison(prisonId: string, date?: string)
           id: `task-${u.id}-${d}-${i}`,
           label,
           done: false,
-          unitId: u.id,
+          unitId: u.id as any,
           date: d,
         }))
         additions.push(...tasks)
@@ -577,13 +673,13 @@ export function initializeTemplateHubsForPrison(prisonId: string, date?: string)
       if (!byUnit[u.id]) byUnit[u.id] = {}
       byUnit[u.id][d] = {
         date: d,
-        tasks: getDailyTasks(u.id, d),
-        muster: getMusterConfirmation(u.id, d),
-        alarms: getCellAlarms(u.id),
-        handover: getHandover(u.id, d),
-        stripSearch: getStripSearch(u.id, d),
-        searches: getSearchTargets(u.id, d),
-        prisoners: getPrisoners(u.id),
+        tasks: getDailyTasks(u.id as any, d),
+        muster: getMusterConfirmation(u.id as any, d),
+        alarms: getCellAlarms(u.id as any),
+        handover: getHandover(u.id as any, d),
+        stripSearch: getStripSearch(u.id as any, d),
+        searches: getSearchTargets(u.id as any, d),
+        prisoners: getPrisoners(u.id as any),
       }
       initialized.push(u.id)
     }
@@ -606,13 +702,13 @@ export function getPrisonDataForPrison(prisonId: string, date?: string) {
   for (const u of units) {
     payload.units[u.id] = {
       unit: u,
-      prisoners: getPrisoners(u.id),
-      dailyTasks: getDailyTasks(u.id, d),
-      muster: getMusterConfirmation(u.id, d),
-      alarms: getCellAlarms(u.id),
-      stripSearch: getStripSearch(u.id, d),
-      searches: getSearchTargets(u.id, d),
-      snapshots: getHubSnapshot(u.id, d),
+      prisoners: getPrisoners(u.id as any),
+      dailyTasks: getDailyTasks(u.id as any, d),
+      muster: getMusterConfirmation(u.id as any, d),
+      alarms: getCellAlarms(u.id as any),
+      stripSearch: getStripSearch(u.id as any, d),
+      searches: getSearchTargets(u.id as any, d),
+      snapshots: getHubSnapshot(u.id as any, d),
     }
   }
   return payload

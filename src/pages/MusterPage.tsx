@@ -16,17 +16,20 @@ import { openPrintPreviewWindow, buildMusterPrintHtml, getOutOfUnitHours } from 
 // Coerce legacy string values to boolean for NTDB/OPs/CCs
 function isNtdbActive(p: Prisoner): boolean {
   if (p.ntdb === true) return true
-  if (typeof p.ntdb === 'string' && (p.ntdb.toLowerCase() === 'yes' || p.ntdb === '1')) return true
+  const maybe = (p as any).ntdb
+  if (typeof maybe === 'string' && (maybe.toLowerCase() === 'yes' || maybe === '1')) return true
   return false
 }
 function isOpsActive(p: Prisoner): boolean {
   if (p.ops === true) return true
-  if (typeof (p as { ops?: string }).ops === 'string' && ((p as { ops?: string }).ops?.toLowerCase() === 'yes' || (p as { ops?: string }).ops === '1')) return true
+  const maybe = (p as any).ops
+  if (typeof maybe === 'string' && (maybe?.toLowerCase() === 'yes' || maybe === '1')) return true
   return false
 }
 function isCcsActive(p: Prisoner): boolean {
   if (p.ccs === true) return true
-  if (typeof (p as { ccs?: string }).ccs === 'string' && ((p as { ccs?: string }).ccs?.toLowerCase() === 'yes' || (p as { ccs?: string }).ccs === '1')) return true
+  const maybe = (p as any).ccs
+  if (typeof maybe === 'string' && (maybe?.toLowerCase() === 'yes' || maybe === '1')) return true
   return false
 }
 

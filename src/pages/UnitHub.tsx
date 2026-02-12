@@ -108,9 +108,14 @@ export default function UnitHub() {
           <Link to={prisonId ? `/prison/${prisonId}` : '/'} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← All units</Link>
           <h1 className="text-2xl font-bold text-corrections-charcoal">{unit.name} Hub</h1>
         </div>
-        <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/muster` : `/unit/${id}/muster`} className="btn-corrections">
-          View / Edit Muster
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/pco` : `/unit/${id}/pco`} className="btn-outline">
+            PCO Hub
+          </Link>
+          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/muster` : `/unit/${id}/muster`} className="btn-corrections">
+            View / Edit Muster
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

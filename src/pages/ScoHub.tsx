@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Layout from '../Layout'
 import { getAuditEntries } from '../store'
-import { PcoPanel } from './PcoPanel'
 import type { AuditEntry } from '../types'
 
 function formatDate(iso: string) {
@@ -16,7 +15,6 @@ export default function ScoHub() {
   const [live, setLive] = useState(false)
   const [intervalMs, setIntervalMs] = useState<number>(5000)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  const [showPcoPanel, setShowPcoPanel] = useState(false)
 
   useEffect(() => {
     const onStorage = () => {
@@ -88,7 +86,6 @@ export default function ScoHub() {
           <p className="text-sm text-slate-600">Running log of movement and location updates (filtered from audit trail).</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setShowPcoPanel(true)} className="btn-corrections">Open PCO Hub</button>
           <Link to={prisonId ? `/prison/${prisonId}/audit` : '/audit'} className="btn-outline">Open Audit Trail</Link>
           <Link to={prisonId ? `/prison/${prisonId}/control` : '/control'} className="btn-outline">Open Control Hub</Link>
         </div>
@@ -147,7 +144,6 @@ export default function ScoHub() {
         )}
       </div>
 
-      {showPcoPanel && <PcoPanel prisonId={prisonId} onClose={() => setShowPcoPanel(false)} />}
     </Layout>
   )
 }

@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import PrisonSelector from './pages/PrisonSelector'
 import UnitSelection from './pages/UnitSelection'
 import UnitHub from './pages/UnitHub'
+import UnitPcoHub from './pages/UnitPcoHub'
 import MusterPage from './pages/MusterPage'
 import AdminHub from './pages/AdminHub'
 import AuditHub from './pages/AuditHub'
@@ -16,9 +17,11 @@ export default function App() {
       <Route path="/prison/:prisonId/control" element={<ControlHub />} />
       <Route path="/prison/:prisonId/unit/:unitId" element={<UnitHub />} />
       <Route path="/prison/:prisonId/unit/:unitId/muster" element={<MusterPage />} />
+      <Route path="/prison/:prisonId/unit/:unitId/pco" element={<UnitPcoHub />} />
       {/* legacy routes (kept for compatibility) */}
       <Route path="/unit/:unitId" element={<UnitHub />} />
       <Route path="/unit/:unitId/muster" element={<MusterPage />} />
+      <Route path="/unit/:unitId/pco" element={<UnitPcoHub />} />
       <Route path="/control" element={<ControlHub />} />
       <Route path="/admin" element={<AdminHub />} />
       <Route path="/sco" element={<ScoHub />} />

@@ -366,12 +366,14 @@ function UnitMovementList({ unitId }: { unitId: string }) {
       ) : (
         <ul className="text-sm space-y-2 max-h-48 overflow-y-auto">
           {entries.map((e) => (
-            <li key={e.id} className="flex items-start justify-between">
-              <div>
+            <li key={e.id} className="flex items-start justify-between border-b border-slate-100 pb-2">
+              <div className="flex-1">
                 <div className="font-medium">{e.action}</div>
-                <div className="text-xs text-slate-500">{e.detail ?? '—'}</div>
+                {e.prisonerName && <div className="text-xs font-medium text-corrections-blue">{e.prisonerName}</div>}
+                {e.prisonerLocation && <div className="text-xs text-slate-600 capitalize">→ {e.prisonerLocation}</div>}
+                {e.detail && <div className="text-xs text-slate-500">{e.detail}</div>}
               </div>
-              <div className="text-xs text-slate-400 whitespace-nowrap">{new Date(e.timestamp).toLocaleTimeString()}</div>
+              <div className="text-xs text-slate-400 whitespace-nowrap ml-2">{new Date(e.timestamp).toLocaleTimeString()}</div>
             </li>
           ))}
         </ul>

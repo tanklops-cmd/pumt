@@ -89,6 +89,8 @@ export interface AuditEntry {
   detail?: string
   unitId?: UnitId
   user?: string
+  prisonerName?: string
+  prisonerLocation?: LocationCode
 }
 
 export interface ControlHandover {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Layout from '../Layout'
 import { getAuditEntries } from '../store'
+import { PcoPanel } from './PcoPanel'
 import type { AuditEntry } from '../types'
 
 function formatDate(iso: string) {
@@ -15,7 +16,7 @@ export default function ScoHub() {
   const [live, setLive] = useState(false)
   const [intervalMs, setIntervalMs] = useState<number>(5000)
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
-  
+  const [showPcoPanel, setShowPcoPanel] = useState(false)
 
   useEffect(() => {
     const onStorage = () => {
@@ -87,6 +88,8 @@ export default function ScoHub() {
           <p className="text-sm text-slate-600">Running log of movement and location updates (filtered from audit trail).</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={() => setShowPcoPanel(true)} className="btn-corrections">Open PCO Hub</button>
+          <Link to={prisonId ? `/prison/${prisonId}/audit` : '/audit'} className="btn-outline">Open Audit Trail</Link>
           <Link to={prisonId ? `/prison/${prisonId}/control` : '/control'} className="btn-outline">Open Control Hub</Link>
         </div>
       </div>
@@ -119,6 +122,8 @@ export default function ScoHub() {
               <tr>
                 <th className="text-left p-2">Time</th>
                 <th className="text-left p-2">Action</th>
+                <th className="text-left p-2">Prisoner</th>
+                <th className="text-left p-2">Location</th>
                 <th className="text-left p-2">Detail</th>
                 <th className="text-left p-2">Unit</th>
               </tr>
@@ -128,6 +133,8 @@ export default function ScoHub() {
                 <tr key={entry.id} className="border-t border-slate-200 hover:bg-slate-50">
                   <td className="p-2 text-slate-600 whitespace-nowrap">{formatDate(entry.timestamp)}</td>
                   <td className="p-2 font-medium">{entry.action}</td>
+                  <td className="p-2 font-medium text-corrections-blue">{entry.prisonerName ?? '—'}</td>
+                  <td className="p-2 capitalize font-medium">{entry.prisonerLocation ?? '—'}</td>
                   <td className="p-2 text-slate-600">{entry.detail ?? '—'}</td>
                   <td className="p-2 capitalize">{entry.unitId ?? '—'}</td>
                 </tr>
@@ -139,6 +146,8 @@ export default function ScoHub() {
           <div className="p-8 text-center text-slate-500">No movement entries yet.</div>
         )}
       </div>
+
+      {showPcoPanel && <PcoPanel prisonId={prisonId} onClose={() => setShowPcoPanel(false)} />}
     </Layout>
   )
 }

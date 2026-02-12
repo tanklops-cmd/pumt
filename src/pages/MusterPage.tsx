@@ -200,11 +200,18 @@ export default function MusterPage() {
         ],
       }
       savePrisoner(id, updated)
+      // Log each prisoner's location change with their name
+      addAuditEntry({
+        action: 'Location updated',
+        detail: `${p.name || p.cell} moved to`,
+        prisonerName: p.name || p.cell,
+        prisonerLocation: newLocation,
+        unitId: id,
+      })
     })
     setPrisonersState(getPrisoners(id))
     setSelectedIds(new Set())
     setLocationModal(false)
-    addAuditEntry({ action: 'Location updated', detail: newLocation, unitId: id })
   }
 
   const securityColor = (s: SecurityClassification | string) => {
@@ -234,7 +241,7 @@ export default function MusterPage() {
     <Layout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to={prisonId ? `/prison/${prisonId}` : `/unit/${id}`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
+          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/sco` : `/unit/${id}/sco`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
           <h1 className="text-2xl font-bold text-corrections-charcoal">{unit.name} — Muster</h1>
         </div>
         <div className="flex flex-wrap gap-2">

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import Layout from '../Layout'
-import { ldapAuthenticate } from '../api'
+
+// Login page kept for reference but no longer routed in the app
+// Authentication removed for demo purposes
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -10,23 +12,15 @@ export default function Login() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    const res = await ldapAuthenticate(username.trim(), password)
-    if (!res.ok) {
-      setError('Login failed')
-      return
-    }
-    // store token and role in session for RBAC checks
-    if (res.token) sessionStorage.setItem('auth_token', res.token)
-    if (res.role) sessionStorage.setItem('auth_role', res.role)
-    // redirect to root
-    window.location.href = '/'
+    // Stub: LDAP authentication removed for demo
+    setError('Login not available in demo mode')
   }
 
   return (
     <Layout>
       <div className="max-w-md mx-auto card p-6">
         <h1 className="text-xl font-bold text-corrections-charcoal mb-2">Sign in</h1>
-        <p className="text-sm text-slate-600 mb-4">Sign in using your LDAP credentials (stubbed locally).</p>
+        <p className="text-sm text-slate-600 mb-4">Authentication is not available in demo mode.</p>
         <form onSubmit={submit}>
           <input
             placeholder="Username"

@@ -1,9 +1,26 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Layout from '../Layout'
-import { getPrisoners, getAuditEntries, getDailyTasks, listHubSnapshots, getHubSnapshot, countIncompleteDailyTasks } from '../store'
+import { getPrisoners, getAuditEntries, getDailyTasks, listHubSnapshots, getHubSnapshot, countIncompleteDailyTasks, getPrisonersPendingInductionNotification, markPrisonerInductionNotified } from '../store'
 import { UNITS, getUnitsForPrison } from '../constants'
-import type { UnitId } from '../types'
+import type { UnitId, Prisoner } from '../types'
+import { getOutOfUnitHours } from '../printUtils'
+
+// Helper to check if OPs is active (handles legacy string values)
+function isOpsActive(p: Prisoner): boolean {
+  if (p.ops === true) return true
+  const maybe = (p as any).ops
+  if (typeof maybe === 'string' && (maybe?.toLowerCase() === 'yes' || maybe === '1')) return true
+  return false
+}
+
+// Helper to check if CCs is active (handles legacy string values)
+function isCcsActive(p: Prisoner): boolean {
+  if (p.ccs === true) return true
+  const maybe = (p as any).ccs
+  if (typeof maybe === 'string' && (maybe?.toLowerCase() === 'yes' || maybe === '1')) return true
+  return false
+}
 
 export default function UnitPcoHub() {
   const { prisonId, unitId } = useParams<{ prisonId?: string; unitId?: string }>()
@@ -17,6 +34,7 @@ export default function UnitPcoHub() {
   const [incompleteCount, setIncompleteCount] = useState(0)
   const [availableSnapshots, setAvailableSnapshots] = useState<string[]>([])
   const [loadedSnapshot, setLoadedSnapshot] = useState<any | null>(null)
+  const [pendingInductions, setPendingInductions] = useState<{ prisoner: Prisoner; id: string }[]>([])
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -27,6 +45,7 @@ export default function UnitPcoHub() {
     const count = countIncompleteDailyTasks(id, today)
     setIncompleteCount(count)
     setAvailableSnapshots(listHubSnapshots(id))
+    setPendingInductions(getPrisonersPendingInductionNotification(id))
 
     const onStorage = () => {
       setPrisoners(getPrisoners(id))
@@ -34,10 +53,18 @@ export default function UnitPcoHub() {
       setTasks(getDailyTasks(id, today))
       const updated = countIncompleteDailyTasks(id, today)
       setIncompleteCount(updated)
+      setPendingInductions(getPrisonersPendingInductionNotification(id))
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [id, today])
+
+  const handleDismissInduction = (prisonerId: string) => {
+    markPrisonerInductionNotified(prisonerId, id)
+    setPendingInductions(getPrisonersPendingInductionNotification(id))
+    setPrisoners(getPrisoners(id))
+    setAudit(getAuditEntries())
+  }
 
   const refreshSnapshots = () => setAvailableSnapshots(listHubSnapshots(id))
   const loadSnapshot = (date: string) => setLoadedSnapshot(getHubSnapshot(id, date))
@@ -66,6 +93,30 @@ export default function UnitPcoHub() {
     OTHER: 'Other',
   }
 
+  // Analytics calculations
+  const totalPrisoners = prisoners.length
+  
+  // Low Yard Hours - prisoners with less than 2 hours in yard
+  const lowYardPrisoners = prisoners.filter((p) => {
+    const { summary } = getOutOfUnitHours(p.locationHistory ?? [], p.location)
+    // Parse hours from summary (e.g., "2.5h Yard" -> 2.5)
+    const yardMatch = summary.match(/([\d.]+)h\s*Yard/)
+    if (!yardMatch) return true // No yard time = low
+    const hours = parseFloat(yardMatch[1])
+    return hours < 1
+  })
+  
+  // Missed Meals - prisoners missing all meals (breakfast, lunch, dinner)
+  const missedMealsPrisoners = prisoners.filter((p) => 
+    !p.mealBreakfast && !p.mealLunch && !p.mealDinner
+  )
+  
+  // OPs active
+  const opsPrisoners = prisoners.filter((p) => isOpsActive(p))
+  
+  // CCs active
+  const ccsPrisoners = prisoners.filter((p) => isCcsActive(p))
+
   return (
     <Layout>
       <div className="mb-6 flex items-center justify-between">
@@ -84,7 +135,7 @@ export default function UnitPcoHub() {
             <div className="text-sm space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-slate-700">Total prisoners:</span>
-                <span className="font-bold text-lg">{prisoners.length}</span>
+                <span className="font-bold text-lg">{totalPrisoners}</span>
               </div>
               <div className="border-t pt-3">
                 <div className="text-xs text-slate-600 mb-2 font-medium">By Location:</div>
@@ -111,8 +162,137 @@ export default function UnitPcoHub() {
                 <p className="text-sm text-orange-700 mt-1">{incompleteCount} task{incompleteCount !== 1 ? 's' : ''} not completed</p>
               </div>
             )}
+            
+            {/* Induction Notifications */}
+            {pendingInductions.length > 0 && (
+              <div className="border-l-4 border-blue-500 bg-blue-50 p-3 rounded">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-blue-600">📋</span>
+                  <h3 className="font-semibold text-blue-800 text-sm">Prisoner Inductions Complete ({pendingInductions.length})</h3>
+                </div>
+                <ul className="space-y-2">
+                  {pendingInductions.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between bg-white p-2 rounded border border-blue-200">
+                      <div>
+                        <div className="text-sm font-medium text-blue-900">{item.prisoner.name || 'Unnamed'}</div>
+                        <div className="text-xs text-blue-700">Cell: {item.prisoner.cell || '—'} • Inducted: {item.prisoner.inductedBy || 'Unknown'}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDismissInduction(item.id)}
+                        className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                      >
+                        Acknowledge
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {/* Analytics Alerts */}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-sm">Analytics & Alerts</h4>
+              
+              {/* Low Yard Hours Alert */}
+              {lowYardPrisoners.length > 0 && (
+                <div className="border-l-4 border-amber-500 bg-amber-50 p-3 rounded">
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-600">⚠️</span>
+                    <h3 className="font-semibold text-amber-800 text-sm">Low Yard Hours ({lowYardPrisoners.length})</h3>
+                  </div>
+                  <p className="text-xs text-amber-700 mt-1">Prisoners with less than 2 hours yard time:</p>
+                  <ul className="mt-2 space-y-1">
+                    {lowYardPrisoners.slice(0, 5).map((p) => (
+                      <li key={p.id} className="text-sm text-amber-800 flex justify-between">
+                        <span>{p.name || p.cell}</span>
+                        <span className="font-mono text-xs">{p.cell}</span>
+                      </li>
+                    ))}
+                    {lowYardPrisoners.length > 5 && (
+                      <li className="text-xs text-amber-700">+{lowYardPrisoners.length - 5} more</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+              
+              {/* Missed Meals Alert */}
+              {missedMealsPrisoners.length > 0 && (
+                <div className="border-l-4 border-red-500 bg-red-50 p-3 rounded">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-600">🍽️</span>
+                    <h3 className="font-semibold text-red-800 text-sm">Missed All Meals ({missedMealsPrisoners.length})</h3>
+                  </div>
+                  <p className="text-xs text-red-700 mt-1">Prisoners who missed all meals:</p>
+                  <ul className="mt-2 space-y-1">
+                    {missedMealsPrisoners.slice(0, 5).map((p) => (
+                      <li key={p.id} className="text-sm text-red-800 flex justify-between">
+                        <span>{p.name || p.cell}</span>
+                        <span className="font-mono text-xs">{p.cell}</span>
+                      </li>
+                    ))}
+                    {missedMealsPrisoners.length > 5 && (
+                      <li className="text-xs text-red-700">+{missedMealsPrisoners.length - 5} more</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+              
+              {/* OPs Active Alert */}
+              {opsPrisoners.length > 0 && (
+                <div className="border-l-4 border-red-600 bg-red-100 p-3 rounded">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-700">🚨</span>
+                    <h3 className="font-semibold text-red-900 text-sm">OPs Active ({opsPrisoners.length})</h3>
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {opsPrisoners.slice(0, 5).map((p) => (
+                      <li key={p.id} className="text-sm text-red-800 flex justify-between">
+                        <span>{p.name || p.cell}</span>
+                        <span className="font-mono text-xs">{p.cell}</span>
+                      </li>
+                    ))}
+                    {opsPrisoners.length > 5 && (
+                      <li className="text-xs text-red-700">+{opsPrisoners.length - 5} more</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+              
+              {/* CCs Active Alert */}
+              {ccsPrisoners.length > 0 && (
+                <div className="border-l-4 border-red-600 bg-red-100 p-3 rounded">
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-700">🚨</span>
+                    <h3 className="font-semibold text-red-900 text-sm">CCs Active ({ccsPrisoners.length})</h3>
+                  </div>
+                  <ul className="mt-2 space-y-1">
+                    {ccsPrisoners.slice(0, 5).map((p) => (
+                      <li key={p.id} className="text-sm text-red-800 flex justify-between">
+                        <span>{p.name || p.cell}</span>
+                        <span className="font-mono text-xs">{p.cell}</span>
+                      </li>
+                    ))}
+                    {ccsPrisoners.length > 5 && (
+                      <li className="text-xs text-red-700">+{ccsPrisoners.length - 5} more</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+              
+              {/* No Alerts */}
+              {lowYardPrisoners.length === 0 && missedMealsPrisoners.length === 0 && opsPrisoners.length === 0 && ccsPrisoners.length === 0 && (
+                <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-600">✓</span>
+                    <span className="text-sm text-green-800 font-medium">No operational alerts</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div>
-              <h4 className="font-semibold text-sm mb-3">Activity Trends</h4>
+              <h4 className="font-semibold text-sm mb-3">Activity Summary</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-slate-50 rounded p-3">
                   <div className="text-xl font-bold text-corrections-blue">{movementEntries.length}</div>

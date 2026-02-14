@@ -6,7 +6,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isAdmin = loc.pathname.startsWith('/admin')
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col relative">
       <header className="bg-corrections-blue text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
@@ -34,6 +34,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <footer className="border-t border-slate-200 bg-white py-3 text-center text-sm text-slate-500">
         Prison Muster Management — Senior Officer Daily Tasks
       </footer>
+      {/* Large centered watermark logo, low opacity */}
+      <img
+        src="/corrections-logo-large.png"
+        alt="Ara Poutama Aotearoa watermark"
+        style={{
+          position: 'fixed',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '60vw',
+          maxWidth: 800,
+          minWidth: 320,
+          opacity: 0.13,
+          pointerEvents: 'none',
+          zIndex: 10,
+          userSelect: 'none',
+        }}
+        aria-hidden="true"
+      />
     </div>
   )
 }

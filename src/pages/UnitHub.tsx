@@ -109,6 +109,9 @@ export default function UnitHub() {
           <h1 className="text-2xl font-bold text-corrections-charcoal">{unit.name} Hub</h1>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/maintenance` : `/unit/${id}/maintenance`} className="btn-outline">
+            Unit Maintenance
+          </Link>
           <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/pco` : `/unit/${id}/pco`} className="btn-outline">
             PCO Hub
           </Link>

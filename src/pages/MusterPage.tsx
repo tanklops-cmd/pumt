@@ -33,6 +33,18 @@ function isCcsActive(p: Prisoner): boolean {
   return false
 }
 
+// Extract last name from full name for sorting
+function getLastName(name: string): string {
+  if (!name) return ''
+  const parts = name.trim().split(/\s+/)
+  return parts.length > 0 ? parts[parts.length - 1].toLowerCase() : ''
+}
+
+// Sort prisoners by last name (A-Z)
+function sortByLastName(prisoners: Prisoner[]): Prisoner[] {
+  return [...prisoners].sort((a, b) => getLastName(a.name).localeCompare(getLastName(b.name)))
+}
+
 function getMusterPrintData(unitName: string, prisoners: Prisoner[]): Parameters<typeof buildMusterPrintHtml>[0] {
   const date = new Date().toISOString().slice(0, 10)
   const jobCounts: Record<string, number> = {}
@@ -77,6 +89,9 @@ function newPrisoner(unitId: UnitId): Prisoner {
     location: 'CELL',
     locationHistory: [],
     unitId,
+    laundryNumberAdded: false,
+    addedToJobsList: false,
+    sacraCompleted: false,
   }
 }
 
@@ -96,12 +111,12 @@ export default function MusterPage() {
   const [moveCellByPrisonerId, setMoveCellByPrisonerId] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    setPrisonersState(getPrisoners(id))
+    setPrisonersState(sortByLastName(getPrisoners(id)))
   }, [id])
 
   const save = (p: Prisoner) => {
     savePrisoner(id, p)
-    setPrisonersState(getPrisoners(id))
+    setPrisonersState(sortByLastName(getPrisoners(id)))
     setEditingId(null)
     addAuditEntry({ action: 'Prisoner saved', detail: p.name || p.cell, unitId: id })
   }
@@ -109,7 +124,7 @@ export default function MusterPage() {
   const remove = (p: Prisoner) => {
     if (confirm(`Remove ${p.name || 'this prisoner'} from muster?`)) {
       deletePrisoner(id, p.id)
-      setPrisonersState(getPrisoners(id))
+      setPrisonersState(sortByLastName(getPrisoners(id)))
       setEditingId(null)
       addAuditEntry({ action: 'Prisoner removed', detail: p.name, unitId: id })
     }
@@ -118,8 +133,9 @@ export default function MusterPage() {
   const addNew = () => {
     const p = newPrisoner(id)
     savePrisoner(id, p)
-    setPrisonersState(getPrisoners(id))
+    setPrisonersState(sortByLastName(getPrisoners(id)))
     setEditingId(p.id)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const toggleSelect = (pid: string) => {
@@ -156,7 +172,7 @@ export default function MusterPage() {
         unitId: targetId,
       })
     })
-    setPrisonersState(getPrisoners(id))
+    setPrisonersState(sortByLastName(getPrisoners(id)))
     setMoveModal(null)
     setMoveTargetUnit('')
     setMoveCellByPrisonerId({})
@@ -209,7 +225,7 @@ export default function MusterPage() {
         unitId: id,
       })
     })
-    setPrisonersState(getPrisoners(id))
+    setPrisonersState(sortByLastName(getPrisoners(id)))
     setSelectedIds(new Set())
     setLocationModal(false)
   }
@@ -241,7 +257,7 @@ export default function MusterPage() {
     <Layout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/sco` : `/unit/${id}/sco`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
+          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}` : `/unit/${id}`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
           <h1 className="text-2xl font-bold text-corrections-charcoal">{unit.name} — Muster</h1>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -571,117 +587,207 @@ function EditRow({
   })
   const initialJobIsManual = (prisoner.job ?? '') !== '' && !JOB_FIXED_VALUES.includes((prisoner.job ?? '') as (typeof JOB_FIXED_VALUES)[number])
   const [jobIsManualEntry, setJobIsManualEntry] = useState(initialJobIsManual)
-  const jobSelectValue = jobIsManualEntry ? JOB_MANUAL_ENTRY : (p.job ?? '')
+  const [jobSelectValue, setJobSelectValue] = useState(initialJobIsManual ? JOB_MANUAL_ENTRY : (p.job ?? ''))
+  const [showInduction, setShowInduction] = useState(false)
+  
+  const handleSave = () => {
+    // If induction is complete, record the timestamp and mark as needing PCO notification
+    if (p.laundryNumberAdded && p.addedToJobsList && !prisoner.laundryNumberAdded) {
+      const updated = {
+        ...p,
+        inductedAt: new Date().toISOString(),
+        pcoNotified: false, // Reset so PCO can be notified
+      }
+      onSave(updated)
+    } else {
+      onSave(p)
+    }
+  }
+  
   return (
     <>
-          <td colSpan={11} className="p-2 bg-slate-50">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <input
-            placeholder="Name"
-            value={p.name}
-            onChange={(e) => setP({ ...p, name: e.target.value })}
-            className="border rounded px-2 py-1"
-          />
-          <input
-            placeholder="Cell"
-            value={p.cell}
-            onChange={(e) => setP({ ...p, cell: e.target.value })}
-            className="border rounded px-2 py-1 font-mono"
-          />
-          <select
-            value={p.security}
-            onChange={(e) => setP({ ...p, security: e.target.value as SecurityClassification })}
-            className="border rounded px-2 py-1"
-          >
-            {SECURITY_OPTIONS.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-          <div className="col-span-2 space-y-1">
+      <td colSpan={11} className="p-2 bg-slate-50">
+        <div className="space-y-3">
+          {/* Basic Info */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <input
+              placeholder="Name"
+              value={p.name}
+              onChange={(e) => setP({ ...p, name: e.target.value })}
+              className="border rounded px-2 py-1"
+            />
+            <input
+              placeholder="Cell"
+              value={p.cell}
+              onChange={(e) => setP({ ...p, cell: e.target.value })}
+              className="border rounded px-2 py-1 font-mono"
+            />
             <select
-              value={jobSelectValue}
-              onChange={(e) => {
-                const v = e.target.value
-                const isManual = v === JOB_MANUAL_ENTRY
-                setJobIsManualEntry(isManual)
-                setP({ ...p, job: isManual ? '' : v })
-              }}
-              className="border rounded px-2 py-1 w-full"
+              value={p.security}
+              onChange={(e) => setP({ ...p, security: e.target.value as SecurityClassification })}
+              className="border rounded px-2 py-1"
             >
-              {JOB_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              {SECURITY_OPTIONS.map((s) => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
-            {jobSelectValue === JOB_MANUAL_ENTRY && (
+            <div className="col-span-2 space-y-1">
+              <select
+                value={jobSelectValue}
+                onChange={(e) => {
+                  const v = e.target.value
+                  const isManual = v === JOB_MANUAL_ENTRY
+                  setJobIsManualEntry(isManual)
+                  setJobSelectValue(v)
+                  setP({ ...p, job: isManual ? '' : v })
+                }}
+                className="border rounded px-2 py-1 w-full"
+              >
+                {JOB_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+              {jobSelectValue === JOB_MANUAL_ENTRY && (
+                <input
+                  type="text"
+                  value={p.job ?? ''}
+                  onChange={(e) => setP({ ...p, job: e.target.value })}
+                  placeholder="Type job here..."
+                  className="border rounded px-2 py-1 w-full text-sm"
+                />
+              )}
+            </div>
+            <input
+              placeholder="Notes"
+              value={p.notes ?? ''}
+              onChange={(e) => setP({ ...p, notes: e.target.value })}
+              className="border rounded px-2 py-1 col-span-2"
+            />
+            <label className="flex items-center gap-2 col-span-2">
               <input
-                type="text"
-                value={p.job ?? ''}
-                onChange={(e) => setP({ ...p, job: e.target.value })}
-                placeholder="Type job here..."
-                className="border rounded px-2 py-1 w-full text-sm"
+                type="checkbox"
+                checked={!!p.ops}
+                onChange={(e) => setP({ ...p, ops: e.target.checked })}
+                className="rounded border-corrections-blue text-corrections-blue"
               />
-            )}
+              <span className="text-sm">OPs</span>
+            </label>
+            <label className="flex items-center gap-2 col-span-2">
+              <input
+                type="checkbox"
+                checked={!!p.ccs}
+                onChange={(e) => setP({ ...p, ccs: e.target.checked })}
+                className="rounded border-corrections-blue text-corrections-blue"
+              />
+              <span className="text-sm">CCs</span>
+            </label>
+            <label className="flex items-center gap-2 col-span-2">
+              <input
+                type="checkbox"
+                checked={!!p.ntdb}
+                onChange={(e) => setP({ ...p, ntdb: e.target.checked })}
+                className="rounded border-corrections-blue text-corrections-blue"
+              />
+              <span className="text-sm">NTDB</span>
+            </label>
+            <label className="flex items-center gap-2 col-span-2">
+              <input
+                type="checkbox"
+                checked={!!p.mealBreakfast}
+                onChange={(e) => setP({ ...p, mealBreakfast: e.target.checked })}
+                className="rounded border-corrections-blue text-corrections-blue"
+              />
+              <span className="text-sm">Breakfast</span>
+            </label>
+            <label className="flex items-center gap-2 col-span-2">
+              <input
+                type="checkbox"
+                checked={!!p.mealLunch}
+                onChange={(e) => setP({ ...p, mealLunch: e.target.checked })}
+                className="rounded border-corrections-blue text-corrections-blue"
+              />
+              <span className="text-sm">Lunch</span>
+            </label>
+            <label className="flex items-center gap-2 col-span-2">
+              <input
+                type="checkbox"
+                checked={!!p.mealDinner}
+                onChange={(e) => setP({ ...p, mealDinner: e.target.checked })}
+                className="rounded border-corrections-blue text-corrections-blue"
+              />
+              <span className="text-sm">Dinner</span>
+            </label>
           </div>
-          <input
-            placeholder="Notes"
-            value={p.notes ?? ''}
-            onChange={(e) => setP({ ...p, notes: e.target.value })}
-            className="border rounded px-2 py-1 col-span-2"
-          />
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={!!p.ops}
-              onChange={(e) => setP({ ...p, ops: e.target.checked })}
-              className="rounded border-corrections-blue text-corrections-blue"
-            />
-            <span className="text-sm">OPs</span>
-          </label>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={!!p.ccs}
-              onChange={(e) => setP({ ...p, ccs: e.target.checked })}
-              className="rounded border-corrections-blue text-corrections-blue"
-            />
-            <span className="text-sm">CCs</span>
-          </label>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={!!p.ntdb}
-              onChange={(e) => setP({ ...p, ntdb: e.target.checked })}
-              className="rounded border-corrections-blue text-corrections-blue"
-            />
-            <span className="text-sm">NTDB</span>
-          </label>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={!!p.mealBreakfast}
-              onChange={(e) => setP({ ...p, mealBreakfast: e.target.checked })}
-              className="rounded border-corrections-blue text-corrections-blue"
-            />
-            <span className="text-sm">Breakfast</span>
-          </label>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={!!p.mealLunch}
-              onChange={(e) => setP({ ...p, mealLunch: e.target.checked })}
-              className="rounded border-corrections-blue text-corrections-blue"
-            />
-            <span className="text-sm">Lunch</span>
-          </label>
-          <label className="flex items-center gap-2 col-span-2">
-            <input
-              type="checkbox"
-              checked={!!p.mealDinner}
-              onChange={(e) => setP({ ...p, mealDinner: e.target.checked })}
-              className="rounded border-corrections-blue text-corrections-blue"
-            />
-            <span className="text-sm">Dinner</span>
-          </label>
+          
+          {/* Induction Section Toggle */}
+          <div className="border-t pt-3">
+            <button
+              type="button"
+              onClick={() => setShowInduction(!showInduction)}
+              className="text-sm text-corrections-blue hover:underline flex items-center gap-1"
+            >
+              {showInduction ? '▼' : '▶'} Induction Details
+              {(p.laundryNumberAdded || p.addedToJobsList) && (
+                <span className="ml-2 inline-block px-2 py-0.5 rounded text-xs bg-green-100 text-green-800">Inducted</span>
+              )}
+            </button>
+          </div>
+          
+          {/* Induction Details */}
+          {showInduction && (
+            <div className="bg-blue-50 p-3 rounded-lg space-y-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!p.laundryNumberAdded}
+                  onChange={(e) => setP({ ...p, laundryNumberAdded: e.target.checked })}
+                  className="rounded border-corrections-blue text-corrections-blue"
+                />
+                <span className="text-sm font-medium">Laundry Number Added</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!p.addedToJobsList}
+                  onChange={(e) => setP({ ...p, addedToJobsList: e.target.checked })}
+                  className="rounded border-corrections-blue text-corrections-blue"
+                />
+                <span className="text-sm font-medium">Added to Jobs List</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={!!p.sacraCompleted}
+                  onChange={(e) => setP({ ...p, sacraCompleted: e.target.checked })}
+                  className="rounded border-corrections-blue text-corrections-blue"
+                />
+                <span className="text-sm font-medium text-slate-600">SACRA Completed (optional)</span>
+              </label>
+              <div>
+                <input
+                  type="text"
+                  value={p.inductionNotes ?? ''}
+                  onChange={(e) => setP({ ...p, inductionNotes: e.target.value })}
+                  placeholder="Induction notes..."
+                  className="border rounded px-2 py-1 w-full text-sm mt-2"
+                />
+              </div>
+              <div>
+                <input
+                  type="text"
+                  value={p.inductedBy ?? ''}
+                  onChange={(e) => setP({ ...p, inductedBy: e.target.value })}
+                  placeholder="Inducted by (name)"
+                  className="border rounded px-2 py-1 w-full text-sm"
+                />
+              </div>
+              {p.inductedAt && (
+                <div className="text-xs text-slate-500">
+                  Inducted: {new Date(p.inductedAt).toLocaleString()}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </td>
       <td className="p-2 bg-slate-50 text-slate-500 text-xs">—</td>
@@ -697,7 +803,7 @@ function EditRow({
         </select>
       </td>
       <td className="p-2 bg-slate-50">
-        <button type="button" onClick={() => onSave(p)} className="text-corrections-blue hover:underline mr-2">Save</button>
+        <button type="button" onClick={handleSave} className="text-corrections-blue hover:underline mr-2">Save</button>
         <button type="button" onClick={onCancel} className="text-slate-600 hover:underline mr-2">Cancel</button>
         <button type="button" onClick={onRemove} className="text-red-600 hover:underline">Remove</button>
       </td>

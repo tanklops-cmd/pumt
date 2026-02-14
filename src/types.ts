@@ -34,6 +34,15 @@ export interface Prisoner {
   location: LocationCode
   locationHistory: LocationRecord[]
   unitId: UnitId
+  // Induction fields
+  laundryNumberAdded?: boolean
+  addedToJobsList?: boolean
+  sacraCompleted?: boolean
+  inductionDocumentName?: string
+  inductionNotes?: string
+  inductedBy?: string
+  inductedAt?: string
+  pcoNotified?: boolean
 }
 
 export interface HandoverSection {
@@ -98,4 +107,38 @@ export interface ControlHandover {
   general?: string
   visits?: string
   other?: string
+}
+
+export type MaintenancePriority = 'Routine' | 'Urgent' | 'Other'
+
+export type MaintenanceStatus = 'Logged' | 'Completed'
+
+export interface UnitMaintenanceEntry {
+  id: string
+  unitId: UnitId
+  prisonId?: string
+  jobDescription: string
+  jobNumber: string
+  priority: MaintenancePriority
+  status: MaintenanceStatus
+  addedBy: string
+  addedAt: string // ISO timestamp
+  date: string // YYYY-MM-DD
+}
+
+export interface PrisonerInduction {
+  id: string
+  unitId: UnitId
+  prisonId?: string
+  prisonerName: string
+  prisonerCell: string
+  laundryNumberAdded: boolean
+  addedToJobsList: boolean
+  sacraCompleted: boolean
+  documentName?: string // uploaded file name
+  inductionNotes?: string // free text notes
+  inductedBy: string
+  inductedAt: string // ISO timestamp
+  date: string // YYYY-MM-DD
+  pcoNotified: boolean
 }

@@ -60,6 +60,23 @@ const A4_STYLE = `
   .work-party-item { font-size: 9pt; }
   .date-line { font-size: 9pt; color: #475569; margin-bottom: 8pt; }
   @media print { h1, h2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  body::after {
+    content: "";
+    position: fixed;
+    left: 50vw;
+    top: 50vh;
+    transform: translate(-50%, -50%);
+    width: 60vw;
+    max-width: 800px;
+    min-width: 320px;
+    height: auto;
+    aspect-ratio: 1.2/1;
+    background: url('/corrections-logo-large.png') no-repeat center center;
+    background-size: contain;
+    opacity: 0.13;
+    pointer-events: none;
+    z-index: 9999;
+  }
 `
 
 const LOCATION_LABELS: Record<string, string> = {

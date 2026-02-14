@@ -7,6 +7,8 @@ import type {
   SearchTarget,
   StripSearchRecord,
   AuditEntry,
+  UnitMaintenanceEntry,
+  PrisonerInduction,
 } from './types'
 import { UNITS, DAILY_TASK_LABELS, FACILITY_OPTIONS, getUnitsForPrison } from './constants'
 import type { UnitId } from './types'
@@ -22,6 +24,8 @@ const STORAGE_KEYS = {
   audit: 'prison-muster-audit',
   controlHandover: 'prison-muster-control-handover',
   hubSnapshots: 'prison-muster-hub-snapshots',
+  unitMaintenance: 'prison-muster-unit-maintenance',
+  prisonerInductions: 'prison-muster-prisoner-inductions',
 }
 
 function today(): string {
@@ -716,4 +720,182 @@ export function getPrisonDataForPrison(prisonId: string, date?: string) {
 
 export function exportPrisonData(prisonId: string, date?: string) {
   return JSON.stringify(getPrisonDataForPrison(prisonId, date), null, 2)
+}
+
+// ——— Unit Maintenance ———
+export function getUnitMaintenanceEntries(unitId?: UnitId): UnitMaintenanceEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.unitMaintenance)
+    if (!raw) return []
+    const all: UnitMaintenanceEntry[] = JSON.parse(raw)
+    if (unitId) {
+      return all.filter((e) => e.unitId === unitId)
+    }
+    return all
+  } catch {
+    return []
+  }
+}
+
+export function addUnitMaintenanceEntry(
+  unitId: UnitId,
+  prisonId: string | undefined,
+  jobDescription: string,
+  jobNumber: string,
+  priority: 'Routine' | 'Urgent' | 'Other',
+  addedBy: string
+): UnitMaintenanceEntry {
+  const entry: UnitMaintenanceEntry = {
+    id: `maint-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    unitId,
+    prisonId,
+    jobDescription,
+    jobNumber,
+    priority,
+    status: 'Logged',
+    addedBy,
+    addedAt: new Date().toISOString(),
+    date: today(),
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.unitMaintenance)
+    const all: UnitMaintenanceEntry[] = raw ? JSON.parse(raw) : []
+    all.unshift(entry)
+    localStorage.setItem(STORAGE_KEYS.unitMaintenance, JSON.stringify(all))
+    addAuditEntry({ action: 'Maintenance entry added', detail: `${jobNumber} - ${jobDescription}`, unitId })
+  } catch (e) {
+    console.error('Failed to add maintenance entry', e)
+  }
+  return entry
+}
+
+export function deleteUnitMaintenanceEntry(entryId: string): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.unitMaintenance)
+    if (!raw) return
+    const all: UnitMaintenanceEntry[] = JSON.parse(raw)
+    const entry = all.find((e) => e.id === entryId)
+    const updated = all.filter((e) => e.id !== entryId)
+    localStorage.setItem(STORAGE_KEYS.unitMaintenance, JSON.stringify(updated))
+    if (entry) {
+      addAuditEntry({ action: 'Maintenance entry deleted', detail: `${entry.jobNumber} - ${entry.jobDescription}`, unitId: entry.unitId })
+    }
+  } catch (e) {
+    console.error('Failed to delete maintenance entry', e)
+  }
+}
+
+export function updateMaintenanceStatus(entryId: string, status: 'Logged' | 'Completed'): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.unitMaintenance)
+    if (!raw) return
+    const all: UnitMaintenanceEntry[] = JSON.parse(raw)
+    const updated = all.map((e) => (e.id === entryId ? { ...e, status } : e))
+    localStorage.setItem(STORAGE_KEYS.unitMaintenance, JSON.stringify(updated))
+    const entry = all.find((e) => e.id === entryId)
+    if (entry) {
+      addAuditEntry({ action: `Maintenance ${status.toLowerCase()}`, detail: `${entry.jobNumber} - ${entry.jobDescription}`, unitId: entry.unitId })
+    }
+  } catch (e) {
+    console.error('Failed to update maintenance status', e)
+  }
+}
+
+// ——— Prisoner Induction ———
+export function getPrisonerInductions(unitId?: UnitId): PrisonerInduction[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.prisonerInductions)
+    if (!raw) return []
+    const all: PrisonerInduction[] = JSON.parse(raw)
+    if (unitId) {
+      return all.filter((e) => e.unitId === unitId)
+    }
+    return all
+  } catch {
+    return []
+  }
+}
+
+export function addPrisonerInduction(
+  unitId: UnitId,
+  prisonId: string | undefined,
+  prisonerName: string,
+  prisonerCell: string,
+  laundryNumberAdded: boolean,
+  addedToJobsList: boolean,
+  sacraCompleted: boolean,
+  documentName: string | undefined,
+  inductedBy: string,
+  inductionNotes?: string
+): PrisonerInduction {
+  const entry: PrisonerInduction = {
+    id: `induction-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    unitId,
+    prisonId,
+    prisonerName,
+    prisonerCell,
+    laundryNumberAdded,
+    addedToJobsList,
+    sacraCompleted,
+    documentName,
+    inductionNotes,
+    inductedBy,
+    inductedAt: new Date().toISOString(),
+    date: today(),
+    pcoNotified: false,
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.prisonerInductions)
+    const all: PrisonerInduction[] = raw ? JSON.parse(raw) : []
+    all.unshift(entry)
+    localStorage.setItem(STORAGE_KEYS.prisonerInductions, JSON.stringify(all))
+    addAuditEntry({ action: 'Prisoner inducted', detail: `${prisonerName || prisonerCell} - ${unitId}`, unitId })
+  } catch (e) {
+    console.error('Failed to add prisoner induction', e)
+  }
+  return entry
+}
+
+export function notifyPCOForInduction(entryId: string): void {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.prisonerInductions)
+    if (!raw) return
+    const all: PrisonerInduction[] = JSON.parse(raw)
+    const entry = all.find((e) => e.id === entryId)
+    const updated = all.map((e) => (e.id === entryId ? { ...e, pcoNotified: true } : e))
+    localStorage.setItem(STORAGE_KEYS.prisonerInductions, JSON.stringify(updated))
+    if (entry) {
+      addAuditEntry({ action: 'PCO notified of induction', detail: `${entry.prisonerName || entry.prisonerCell} - ${entry.unitId}`, unitId: entry.unitId })
+    }
+  } catch (e) {
+    console.error('Failed to notify PCO', e)
+  }
+}
+
+// Get prisoners pending PCO notification (from prisoner data, not induction records)
+export function getPrisonersPendingInductionNotification(unitId: UnitId): { prisoner: Prisoner; id: string }[] {
+  try {
+    const prisoners = getPrisoners(unitId)
+    return prisoners
+      .filter((p) => p.laundryNumberAdded && p.addedToJobsList && !p.pcoNotified)
+      .map((p) => ({ prisoner: p, id: p.id }))
+  } catch {
+    return []
+  }
+}
+
+export function markPrisonerInductionNotified(prisonerId: string, unitId: UnitId): void {
+  try {
+    const prisoners = getAllPrisoners()
+    const updated = prisoners.map((p) => 
+      p.id === prisonerId && p.unitId === unitId ? { ...p, pcoNotified: true } : p
+    )
+    localStorage.setItem(STORAGE_KEYS.prisoners, JSON.stringify(updated))
+    const p = prisoners.find((p) => p.id === prisonerId)
+    if (p) {
+      addAuditEntry({ action: 'PCO notified of induction', detail: `${p.name || p.cell} - ${unitId}`, unitId })
+    }
+  } catch (e) {
+    console.error('Failed to mark prisoner induction notified', e)
+  }
 }

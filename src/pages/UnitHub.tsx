@@ -62,9 +62,9 @@ export default function UnitHub() {
       })
   }, [id])
 
-  // Listen for storage events (from other browsers)
+  // Listen for sync updates (from other browsers via WebSocket or same-browser localStorage)
   useEffect(() => {
-    const handleStorage = () => {
+    const handleSync = () => {
       const unitPrisoners = getPrisoners(id)
       const unitCells = [...new Set(unitPrisoners.map((p) => p.cell))].sort()
       setTasks(ensureDailyTasks(id, today()))
@@ -74,9 +74,15 @@ export default function UnitHub() {
       setStripSearchState(getStripSearch(id, today()))
       setHandoverState(getHandover(id, today()))
     }
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
-  }, [id, cells.join(',')])
+    // Listen for WebSocket sync events
+    window.addEventListener('data-synced', handleSync)
+    // Listen for storage events (same-browser tabs)
+    window.addEventListener('storage', handleSync)
+    return () => {
+      window.removeEventListener('data-synced', handleSync)
+      window.removeEventListener('storage', handleSync)
+    }
+  }, [id])
 
   const saveHandover = (field: keyof typeof handover, value: string) => {
     const next = { ...handover, [field]: value }

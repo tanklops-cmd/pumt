@@ -118,14 +118,7 @@ export function useSync() {
       // Try to fetch from backend
       const data = await api.fetchAllData();
       
-      // Check if there's actually new data from backend (compare timestamps)
-      const lastSync = localStorage.getItem(STORAGE_KEYS.lastSync);
-      const backendTime = new Date(data.timestamp).getTime();
-      const lastSyncTime = lastSync ? new Date(lastSync).getTime() : 0;
-      
-      // Only trigger re-render if backend has newer data
-      const hasNewData = backendTime > lastSyncTime;
-      
+      // Always save and sync - don't check timestamps (multi-device scenario)
       // Save prisoners as-is (array)
       saveToLocalStorage(STORAGE_KEYS.prisoners, data.prisoners);
       

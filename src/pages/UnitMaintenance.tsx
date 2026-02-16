@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Layout from '../Layout'
 import { UNITS, getUnitsForPrison } from '../constants'
@@ -13,6 +13,25 @@ export default function UnitMaintenance() {
 
   const [entries, setEntries] = useState(() => getUnitMaintenanceEntries(id))
   const [showForm, setShowForm] = useState(false)
+
+  // Listen for sync updates from other browsers
+  useEffect(() => {
+    const handleSync = () => {
+      setEntries(getUnitMaintenanceEntries(id))
+    }
+    window.addEventListener('data-synced', handleSync)
+    // Also listen for storage events (sync between tabs)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'prison-muster-unit-maintenance') {
+        setEntries(getUnitMaintenanceEntries(id))
+      }
+    }
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener('data-synced', handleSync)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [id])
   const [jobDescription, setJobDescription] = useState('')
   const [jobNumber, setJobNumber] = useState('')
   const [priority, setPriority] = useState<'Routine' | 'Urgent' | 'Other'>('Routine')

@@ -28,7 +28,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-const dataSource = new DataSource({
+export const dataSource = new DataSource({
   type: 'sqljs',
   location: 'prison_muster.sql',
   synchronize: true,
@@ -60,20 +60,21 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use('/api/screenshots', express.static(path.join(process.cwd(), 'screenshots')));
 
+// API routes MUST come before static file serving
 app.use('/api/auth', authRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/data', dataRoutes);
-
-// Serve static frontend in production
-const frontendPath = path.join(__dirname, '../../dist');
-app.use(express.static(frontendPath));
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve frontend for all other routes (SPA)
-app.get(/^((?!api).)*$/, (_req, res) => {
+// Serve static frontend in production (after API routes)
+const frontendPath = path.join(__dirname, '../../dist');
+app.use(express.static(frontendPath));
+
+// Serve frontend for root path only (Cloudflare Tunnel handles the rest)
+app.get('/', (_req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
@@ -83,5 +84,3 @@ const server = app.listen(PORT, () => {
 
 // Initialize WebSocket
 initWebSocket(server);
-
-export { dataSource };

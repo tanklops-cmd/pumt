@@ -1,5 +1,4 @@
 import { Router, Response } from 'express';
-import { DataSource } from 'typeorm';
 import { Prisoner } from '../entity/Prisoner';
 import { DailyTask } from '../entity/DailyTask';
 import { MusterConfirmation } from '../entity/MusterConfirmation';
@@ -11,13 +10,17 @@ import { PrisonerInduction } from '../entity/PrisonerInduction';
 import { StripSearch } from '../entity/StripSearch';
 import { UnitConfig } from '../entity/UnitConfig';
 import { broadcastUpdate } from '../ws';
+import { dataSource } from '../index';
 
 const router = Router();
+
+// Helper to get the shared DataSource
+const getDataSource = () => dataSource;
 
 // Helper to broadcast after any data change
 const broadcastChange = async () => {
   try {
-    const ds = getDataSource();
+    const ds = dataSource;
     if (!ds.isInitialized) await ds.initialize();
     
     const data = {
@@ -30,6 +33,7 @@ const broadcastChange = async () => {
       stripSearches: await ds.getRepository(StripSearch).find(),
       unitMaintenance: await ds.getRepository(UnitMaintenance).find(),
       prisonerInductions: await ds.getRepository(PrisonerInduction).find(),
+      unitConfigs: await ds.getRepository(UnitConfig).find(),
       timestamp: new Date().toISOString(),
     };
     broadcastUpdate(data);
@@ -37,26 +41,6 @@ const broadcastChange = async () => {
     console.error('Broadcast error:', e);
   }
 };
-
-// Create a shared DataSource
-const getDataSource = () => new DataSource({
-  type: 'sqljs',
-  location: 'prison_muster.sql',
-  autoSave: true,
-  synchronize: true,
-  entities: [
-    Prisoner,
-    DailyTask,
-    MusterConfirmation,
-    CellAlarm,
-    HandoverSection,
-    SearchTarget,
-    UnitMaintenance,
-    PrisonerInduction,
-    StripSearch,
-    UnitConfig,
-  ],
-});
 
 // ==================== PRISONERS ====================
 
@@ -93,6 +77,7 @@ router.post('/prisoners', async (req, res: Response) => {
     const repo = ds.getRepository(Prisoner);
     const prisoner = repo.create(req.body);
     await repo.save(prisoner);
+    broadcastChange();
     res.status(201).json(prisoner);
   } catch (error) {
     console.error('Error creating prisoner:', error);
@@ -112,6 +97,7 @@ router.put('/prisoners/:id', async (req, res: Response) => {
     }
     Object.assign(prisoner, req.body);
     await repo.save(prisoner);
+    broadcastChange();
     res.json(prisoner);
   } catch (error) {
     console.error('Error updating prisoner:', error);
@@ -125,6 +111,7 @@ router.delete('/prisoners/:id', async (req, res: Response) => {
     if (!ds.isInitialized) await ds.initialize();
     const repo = ds.getRepository(Prisoner);
     const result = await repo.delete(req.params.id);
+    broadcastChange();
     res.json({ success: true, result });
   } catch (error) {
     console.error('Error deleting prisoner:', error);
@@ -201,6 +188,7 @@ router.post('/tasks/bulk', async (req, res: Response) => {
         await repo.save(newTask);
       }
     }
+    broadcastChange();
     res.json({ success: true });
   } catch (error) {
     console.error('Error bulk updating tasks:', error);
@@ -327,6 +315,7 @@ router.post('/alarms/bulk', async (req, res: Response) => {
         await repo.save(newAlarm);
       }
     }
+    broadcastChange();
     res.json({ success: true });
   } catch (error) {
     console.error('Error bulk updating alarms:', error);
@@ -499,6 +488,7 @@ router.post('/maintenance', async (req, res: Response) => {
     const repo = ds.getRepository(UnitMaintenance);
     const maintenance = repo.create(req.body);
     await repo.save(maintenance);
+    broadcastChange();
     res.status(201).json(maintenance);
   } catch (error) {
     console.error('Error creating maintenance:', error);
@@ -518,6 +508,7 @@ router.put('/maintenance/:id', async (req, res: Response) => {
     }
     Object.assign(maintenance, req.body);
     await repo.save(maintenance);
+    broadcastChange();
     res.json(maintenance);
   } catch (error) {
     console.error('Error updating maintenance:', error);
@@ -531,6 +522,7 @@ router.delete('/maintenance/:id', async (req, res: Response) => {
     if (!ds.isInitialized) await ds.initialize();
     const repo = ds.getRepository(UnitMaintenance);
     await repo.delete(req.params.id);
+    broadcastChange();
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting maintenance:', error);
@@ -606,6 +598,8 @@ router.get('/sync', async (_req, res: Response) => {
     const maintenance = await ds.getRepository(UnitMaintenance).find();
     const inductions = await ds.getRepository(PrisonerInduction).find();
 
+    const configs = await ds.getRepository(UnitConfig).find();
+
     res.json({
       prisoners,
       dailyTasks: tasks,
@@ -616,6 +610,7 @@ router.get('/sync', async (_req, res: Response) => {
       stripSearches,
       unitMaintenance: maintenance,
       prisonerInductions: inductions,
+      unitConfigs: configs,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -683,10 +678,12 @@ router.post('/unit-config', async (req, res: Response) => {
       existing.facilities = facilities || [];
       existing.updatedAt = new Date();
       await repo.save(existing);
+      broadcastChange();
       res.json(existing);
     } else {
       const config = repo.create({ unitId, cells: cells || [], facilities: facilities || [] });
       await repo.save(config);
+      broadcastChange();
       res.status(201).json(config);
     }
   } catch (error) {
@@ -701,6 +698,7 @@ router.delete('/unit-config/:unitId', async (req, res: Response) => {
     if (!ds.isInitialized) await ds.initialize();
     const repo = ds.getRepository(UnitConfig);
     await repo.delete({ unitId: req.params.unitId });
+    broadcastChange();
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting unit config:', error);

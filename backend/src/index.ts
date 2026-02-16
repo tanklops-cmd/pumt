@@ -15,6 +15,7 @@ import { SearchTarget } from './entity/SearchTarget';
 import { UnitMaintenance } from './entity/UnitMaintenance';
 import { PrisonerInduction } from './entity/PrisonerInduction';
 import { StripSearch } from './entity/StripSearch';
+import { UnitConfig } from './entity/UnitConfig';
 import auditRoutes from './routes/audit';
 import authRoutes from './routes/auth';
 import dataRoutes from './routes/data';
@@ -43,6 +44,7 @@ const dataSource = new DataSource({
     UnitMaintenance,
     PrisonerInduction,
     StripSearch,
+    UnitConfig,
   ],
 });
 
@@ -62,12 +64,17 @@ app.use('/api/auth', authRoutes);
 app.use('/api/audit', auditRoutes);
 app.use('/api/data', dataRoutes);
 
+// Serve static frontend in production
+const frontendPath = path.join(__dirname, '../../dist');
+app.use(express.static(frontendPath));
+
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.get('/', (_req, res) => {
-  res.redirect('http://localhost:5173');
+// Serve frontend for all other routes (SPA)
+app.get(/^((?!api).)*$/, (_req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
 const server = app.listen(PORT, () => {

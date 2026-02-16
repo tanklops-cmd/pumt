@@ -48,6 +48,8 @@ export const DAILY_TASK_LABELS = [
   'Unit Inspections',
   'Lockdown Check',
   'Handover Complete',
+  'Hoffman Knife',
+  'Cutdown Scissors',
 ]
 
 /** Fixed job choices shown in the dropdown. */
@@ -69,6 +71,14 @@ export const JOB_MANUAL_ENTRY = '__OTHER__'
 export const JOB_FIXED_VALUES = ['', 'Grounds', 'Horticulture', 'Kitchen', 'Wing Orderly', 'Laundry', 'Sewing Room'] as const
 
 export const SECURITY_OPTIONS = ['UNCLASS', 'L1', 'L2', 'MIN', 'LOW', 'L/MED', 'MED', 'HIGH', 'MAX'] as const
+
+export const CATEGORY_OPTIONS = [
+  { value: '', label: '—' },
+  { value: 'RMD/ACC', label: 'RMD/ACC' },
+  { value: 'RMD/CONV', label: 'RMD/CONV' },
+  { value: 'CONV', label: 'CONV' },
+  { value: 'RECALL', label: 'RECALL' },
+] as const
 
 export const LOCATION_OPTIONS = [
   { value: 'CELL', label: 'Cell' },

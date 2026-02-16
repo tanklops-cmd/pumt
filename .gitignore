@@ -1,0 +1,42 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# TypeScript
+dist/
+build/
+*.tsbuildinfo
+
+# Backend SQL.js DB (if generated)
+backend/prison_muster.sql
+
+# React
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Editor junk
+.vscode/
+.history/
+.DS_Store
+Thumbs.db
+
+# Cline / AI agent
+.cline/
+.clineignore
+*.cline
+
+# Optional: ignore generated backend modules
+# backend/modules/
+back/node_modules

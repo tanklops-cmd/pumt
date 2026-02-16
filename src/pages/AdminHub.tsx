@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import Layout from '../Layout'
 import { getAuditEntries, replaceAllPrisoners, addAuditEntry, listHubSnapshots, getHubSnapshot } from '../store'
 import type { AuditEntry } from '../types'
 import { ADMIN_PASSWORD } from '../constants'
 import { generateMockPrisoners } from '../mockPrisoners'
 import { UNITS } from '../constants'
+import * as api from '../api'
 
 const STORAGE_ADMIN_KEY = 'prison-muster-admin-ok'
 
@@ -84,13 +86,24 @@ export default function AdminHub() {
     return d.toLocaleString('en-NZ', { dateStyle: 'short', timeStyle: 'short' })
   }
 
-  const loadMockPrisoners = () => {
+  const loadMockPrisoners = async () => {
     if (!confirm('This will replace all current prisoners with 190 mock prisoners across all units. Continue?')) return
+    
     const mock = generateMockPrisoners()
     replaceAllPrisoners(mock)
+    
+    // Push each prisoner to backend
+    for (const prisoner of mock) {
+      try {
+        await api.savePrisoner(prisoner)
+      } catch (e) {
+        console.error('Failed to save prisoner:', prisoner.id, e)
+      }
+    }
+    
     addAuditEntry({ action: 'Mock data loaded', detail: '190 prisoners' })
     setAudit(getAuditEntries())
-    alert('Loaded 190 mock prisoners (North: 48, South: 48, Remand: 47, Centre: 47).')
+    alert('Loaded 190 mock prisoners (South: 60, Centre: 60, North: 35, Remand: 35).')
   }
 
   const refreshSnapshots = (unitId = selectedUnit) => {
@@ -107,6 +120,12 @@ export default function AdminHub() {
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <h1 className="text-2xl font-bold text-corrections-charcoal">Audit trail</h1>
         <div className="flex gap-2 flex-wrap">
+          <Link
+            to="/unit-config"
+            className="btn-corrections text-sm"
+          >
+            Unit Config
+          </Link>
           <button
             type="button"
             onClick={loadMockPrisoners}

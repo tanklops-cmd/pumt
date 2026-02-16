@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Layout from '../Layout'
-import { UNITS, getUnitsForPrison, LOCATION_OPTIONS, JOB_OPTIONS, SECURITY_OPTIONS, JOB_MANUAL_ENTRY, JOB_FIXED_VALUES } from '../constants'
+import { UNITS, getUnitsForPrison, LOCATION_OPTIONS, JOB_OPTIONS, SECURITY_OPTIONS, JOB_MANUAL_ENTRY, JOB_FIXED_VALUES, CATEGORY_OPTIONS } from '../constants'
 import type { UnitId } from '../types'
-import type { Prisoner, SecurityClassification, LocationCode } from '../types'
+import type { Prisoner, SecurityClassification, LocationCode, PrisonerCategory } from '../types'
 import {
   getPrisoners,
   savePrisoner,
@@ -56,6 +56,8 @@ function getMusterPrintData(unitName: string, prisoners: Prisoner[]): Parameters
       name: p.name || '—',
       cell: p.cell || '—',
       security: p.security,
+      category: p.category || '',
+      protection: p.protection ? 'PROT' : '',
       job: p.job || '—',
       notes: p.notes || '—',
       ops: isOpsActive(p) ? 'Yes' : '—',
@@ -114,7 +116,13 @@ export default function MusterPage() {
     setPrisonersState(sortByLastName(getPrisoners(id)))
   }, [id])
 
-  const save = (p: Prisoner) => {
+  const save = (p: Prisoner, skipCcsCheck = false) => {
+    // Check if CCs is being enabled - prompt user about AT RISK (skip if already checked in EditRow)
+    if (p.ccs && !skipCcsCheck) {
+      if (!confirm('CCs has been selected. Have you completed the AT RISK form?')) {
+        return // User cancelled, don't save
+      }
+    }
     savePrisoner(id, p)
     setPrisonersState(sortByLastName(getPrisoners(id)))
     setEditingId(null)
@@ -387,30 +395,32 @@ export default function MusterPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto overflow-y-visible">
-        <table className="w-full text-sm" style={{ minWidth: '960px', tableLayout: 'fixed' }}>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+        <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '36px' }} />
-            <col style={{ width: '36px' }} />
-            <col style={{ width: '36px' }} />
-            <col style={{ width: '220px' }} />
+            <col style={{ width: '40px' }} />
+            <col style={{ width: '40px' }} />
+            <col style={{ width: '40px' }} />
+            <col style={{ width: 'auto' }} />
+            <col style={{ width: '70px' }} />
+            <col style={{ width: '60px' }} />
             <col style={{ width: '80px' }} />
+            <col style={{ width: '55px' }} />
+            <col style={{ width: '100px' }} />
+            <col style={{ width: '120px' }} />
+            <col style={{ width: '45px' }} />
+            <col style={{ width: '45px' }} />
+            <col style={{ width: '45px' }} />
             <col style={{ width: '80px' }} />
-            <col style={{ width: '110px' }} />
-            <col style={{ width: '140px' }} />
-            <col style={{ width: '44px' }} />
-            <col style={{ width: '44px' }} />
-            <col style={{ width: '44px' }} />
-            <col style={{ width: '110px' }} />
-            <col style={{ width: '90px' }} />
-            <col style={{ width: '154px' }} />
+            <col style={{ width: '70px' }} />
+            <col style={{ width: '100px' }} />
           </colgroup>
           <thead>
             <tr className="bg-corrections-blue text-white">
               <th className="text-left p-2">B</th>
               <th className="text-left p-2">L</th>
               <th className="text-left p-2">D</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '220px' }}>
+              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '180px' }}>
                 <label className="inline-flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -421,19 +431,18 @@ export default function MusterPage() {
                   <span>Name</span>
                 </label>
               </th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '72px' }}>Cell</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '72px' }}>Security</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '100px' }}>Job</th>
+              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '60px' }}>Cell</th>
+              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '60px' }}>Sec</th>
+              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '60px' }}>Cat</th>
+              <th className="text-left p-2 w-10">P</th>
+              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '90px' }}>Job</th>
               <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '100px' }}>Notes</th>
-              <th className="text-left p-2 w-12">OPs</th>
-              <th className="text-left p-2 w-12">CCs</th>
-              <th className="text-left p-2 w-12">NTDB</th>
-              <th className="text-left p-2 w-12">B</th>
-              <th className="text-left p-2 w-12">L</th>
-              <th className="text-left p-2 w-12">D</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '100px' }}>Hours out of unit</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '80px' }}>Current location</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '140px' }}>Actions</th>
+              <th className="text-left p-2 w-10">OPs</th>
+              <th className="text-left p-2 w-10">CCs</th>
+              <th className="text-left p-2 w-10">NT</th>
+              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '90px' }}>Hours out</th>
+              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '70px' }}>Location</th>
+              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '120px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -462,7 +471,7 @@ export default function MusterPage() {
                         checked={!!p.mealBreakfast}
                         onChange={() => {
                           const next = { ...p, mealBreakfast: !p.mealBreakfast }
-                          save(next)
+                          save(next, true)
                         }}
                         className="rounded border-corrections-blue text-corrections-blue"
                       />
@@ -473,7 +482,7 @@ export default function MusterPage() {
                         checked={!!p.mealLunch}
                         onChange={() => {
                           const next = { ...p, mealLunch: !p.mealLunch }
-                          save(next)
+                          save(next, true)
                         }}
                         className="rounded border-corrections-blue text-corrections-blue"
                       />
@@ -484,7 +493,7 @@ export default function MusterPage() {
                         checked={!!p.mealDinner}
                         onChange={() => {
                           const next = { ...p, mealDinner: !p.mealDinner }
-                          save(next)
+                          save(next, true)
                         }}
                         className="rounded border-corrections-blue text-corrections-blue"
                       />
@@ -497,7 +506,11 @@ export default function MusterPage() {
                           onChange={() => toggleSelect(p.id)}
                           className="rounded border-corrections-blue text-corrections-blue"
                         />
-                        <span className="block break-words text-slate-900 font-medium">{p.name || '—'}</span>
+                        <span className={`block break-words font-medium ${
+                          p.category === 'RMD/ACC' ? 'text-red-600' :
+                          p.category === 'RMD/CONV' ? 'text-green-600' :
+                          'text-slate-900'
+                        }`}>{p.name || '—'}</span>
                       </label>
                     </td>
                     <td className={`p-2 align-top font-mono ${ntdbOn ? 'bg-amber-100' : ''}`}>
@@ -507,6 +520,18 @@ export default function MusterPage() {
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${securityColor(p.security)}`}>
                         {p.security}
                       </span>
+                    </td>
+                    <td className={`p-2 align-top ${ntdbOn ? 'bg-amber-100' : ''}`}>
+                      <span className={`block text-xs font-medium ${
+                        p.category === 'RMD/ACC' ? 'text-red-600 font-bold' :
+                        p.category === 'RMD/CONV' ? 'text-green-600 font-bold' :
+                        'text-slate-700'
+                      }`}>
+                        {p.category || '—'}
+                      </span>
+                    </td>
+                    <td className={`p-2 align-top ${ntdbOn ? 'bg-amber-100' : ''}`}>
+                      {p.protection ? <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">PROT</span> : '—'}
                     </td>
                     <td className={`p-2 align-top ${ntdbOn ? 'bg-amber-100' : ''}`}>
                       <span className="block break-words text-slate-900">{p.job || '—'}</span>
@@ -532,27 +557,41 @@ export default function MusterPage() {
                       </span>
                     </td>
                     <td className={`p-2 align-top ${ntdbOn ? 'bg-amber-100' : ''}`}>
-                      <button
-                        type="button"
-                        onClick={() => setEditingId(p.id)}
-                        className="text-corrections-blue hover:underline mr-1"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openMoveModal([p.id])}
-                        className="text-corrections-blue hover:underline mr-1"
-                      >
-                        Move
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => remove(p)}
-                        className="text-red-600 hover:underline"
-                      >
-                        Remove
-                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          className="text-slate-500 hover:text-slate-700 p-1 rounded hover:bg-slate-100"
+                          onClick={(e) => {
+                            const btn = e.currentTarget.nextElementSibling as HTMLElement
+                            btn?.classList.toggle('hidden')
+                          }}
+                        >
+                          ⋮
+                        </button>
+                        <div className="hidden absolute right-0 mt-1 w-32 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
+                          <button
+                            type="button"
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100"
+                            onClick={() => setEditingId(p.id)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-100"
+                            onClick={() => openMoveModal([p.id])}
+                          >
+                            Move
+                          </button>
+                          <button
+                            type="button"
+                            className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                            onClick={() => remove(p)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
                     </td>
                   </>
                 )}
@@ -591,6 +630,12 @@ function EditRow({
   const [showInduction, setShowInduction] = useState(false)
   
   const handleSave = () => {
+    // Check if CCs is being enabled - prompt user about AT RISK
+    if (p.ccs && !prisoner.ccs) {
+      if (!confirm('CCs has been selected. Have you completed the AT RISK form?')) {
+        return // User cancelled, don't save
+      }
+    }
     // If induction is complete, record the timestamp and mark as needing PCO notification
     if (p.laundryNumberAdded && p.addedToJobsList && !prisoner.laundryNumberAdded) {
       const updated = {
@@ -606,7 +651,7 @@ function EditRow({
   
   return (
     <>
-      <td colSpan={11} className="p-2 bg-slate-50">
+      <td colSpan={16} className="p-2 bg-slate-50">
         <div className="space-y-3">
           {/* Basic Info */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -716,6 +761,24 @@ function EditRow({
                 className="rounded border-corrections-blue text-corrections-blue"
               />
               <span className="text-sm">Dinner</span>
+            </label>
+            <select
+              value={p.category ?? ''}
+              onChange={(e) => setP({ ...p, category: e.target.value as PrisonerCategory })}
+              className="border rounded px-2 py-1 col-span-2"
+            >
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <label className="flex items-center gap-2 col-span-2">
+              <input
+                type="checkbox"
+                checked={!!p.protection}
+                onChange={(e) => setP({ ...p, protection: e.target.checked })}
+                className="rounded border-corrections-blue text-corrections-blue"
+              />
+              <span className="text-sm">Protection</span>
             </label>
           </div>
           

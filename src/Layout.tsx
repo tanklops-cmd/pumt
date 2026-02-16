@@ -10,7 +10,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="bg-corrections-blue text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <span className="font-bold text-lg">Invercargill Prison</span>
+            <span className="font-bold text-lg">Ara Poutama Aotearoa</span>
             <span className="text-corrections-blue-pale/90 text-sm font-medium">Unit Management System</span>
           </Link>
           <nav className="flex items-center gap-4">

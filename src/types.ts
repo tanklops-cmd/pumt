@@ -18,6 +18,8 @@ export interface LocationRecord {
   to?: string
 }
 
+export type PrisonerCategory = 'RMD/ACC' | 'RMD/CONV' | 'CONV' | 'RECALL' | ''
+
 export interface Prisoner {
   id: string
   name: string
@@ -34,6 +36,10 @@ export interface Prisoner {
   location: LocationCode
   locationHistory: LocationRecord[]
   unitId: UnitId
+  // Category for muster display
+  category?: PrisonerCategory
+  // Protection flag
+  protection?: boolean
   // Induction fields
   laundryNumberAdded?: boolean
   addedToJobsList?: boolean
@@ -50,6 +56,11 @@ export interface HandoverSection {
   medicalNotes?: string
   peopleOffPrivileges?: string
   confinement?: string
+  // Unit staff on duty
+  scoName?: string
+  co1Name?: string
+  co2Name?: string
+  co3Name?: string
 }
 
 export interface DailyTask {
@@ -64,6 +75,9 @@ export interface MusterConfirmation {
   unlock: boolean
   random: boolean
   lockup: boolean
+  // Muster details
+  totalMustered?: number
+  musterdBy?: string // Staff who performed muster (comma-separated from staff on duty)
   unitId: UnitId
   date: string
 }

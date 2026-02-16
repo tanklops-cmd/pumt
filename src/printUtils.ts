@@ -97,10 +97,17 @@ export interface HandoverPrintData {
   medicalNotes?: string
   peopleOffPrivileges?: string
   confinement?: string
+  scoName?: string
+  co1Name?: string
+  co2Name?: string
+  co3Name?: string
 }
 
 export function buildHandoverPrintHtml(data: HandoverPrintData): string {
-  const { unitName, date, standingOrders, medicalNotes, peopleOffPrivileges, confinement } = data
+  const { unitName, date, standingOrders, medicalNotes, peopleOffPrivileges, confinement, scoName, co1Name, co2Name, co3Name } = data
+  
+  // Build staff on duty section
+  const staffNames = [scoName, co1Name, co2Name, co3Name].filter(Boolean).join(', ')
   const dateFormatted = new Date(date + 'T12:00:00').toLocaleDateString('en-NZ', {
     weekday: 'long',
     year: 'numeric',
@@ -110,8 +117,9 @@ export function buildHandoverPrintHtml(data: HandoverPrintData): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${A4_STYLE}</style></head><body class="page">
     <h1>${escapeHtml(unitName)} — Handover</h1>
     <p class="date-line">${escapeHtml(dateFormatted)}</p>
+    ${staffNames ? `<div class="section"><div class="section-title">Staff on Duty</div><div class="section-body">${escapeHtml(staffNames)}</div></div>` : ''}
     <div class="section">
-      <div class="section-title">Standing orders</div>
+      <div class="section-title">General Notes</div>
       <div class="section-body">${escapeHtml(standingOrders ?? '')}</div>
     </div>
     <div class="section">
@@ -165,6 +173,8 @@ export interface PrisonerPrintRow {
   name: string
   cell: string
   security: string
+  category?: string
+  protection?: string
   job: string
   notes: string
   ops: string
@@ -196,20 +206,27 @@ export function buildMusterPrintHtml(data: MusterPrintData, options?: { singlePa
       const flags = [p.ops ? 'O' : '', p.ccs ? 'C' : '', p.ntdb ? 'N' : '']
         .filter(Boolean)
         .join('')
+      // Category color style for print (applies to name too)
+      const nameStyle = p.category === 'RMD/ACC' ? 'color:red;' : p.category === 'RMD/CONV' ? 'color:green;' : ''
+      const catStyle = p.category === 'RMD/ACC' ? 'color:red;font-weight:bold;' : p.category === 'RMD/CONV' ? 'color:green;font-weight:bold;' : ''
       if (single) {
         return `<tr>
-          <td>${escapeHtml(p.name)}</td>
+          <td style="${nameStyle}">${escapeHtml(p.name)}</td>
           <td style="text-align:center">${escapeHtml(p.cell)}</td>
           <td style="text-align:center">${escapeHtml(p.security)}</td>
+          <td style="text-align:center;${catStyle}">${escapeHtml(p.category || '')}</td>
+          <td style="text-align:center">${p.protection ? 'PROT' : ''}</td>
           <td style="text-align:center">${escapeHtml(flags)}</td>
           <td style="text-align:center">${escapeHtml(p.hoursOut)}</td>
           <td>${escapeHtml(p.currentLocation)}</td>
         </tr>`
       }
       return `<tr>
-          <td>${escapeHtml(p.name)}</td>
+          <td style="${nameStyle}">${escapeHtml(p.name)}</td>
           <td>${escapeHtml(p.cell)}</td>
           <td>${escapeHtml(p.security)}</td>
+          <td style="${catStyle}">${escapeHtml(p.category || '')}</td>
+          <td style="text-align:center">${p.protection ? 'PROT' : ''}</td>
           <td>${escapeHtml(p.job)}</td>
           <td style="text-align:center">${escapeHtml(flags)}</td>
           <td>${escapeHtml(p.hoursOut)}</td>
@@ -246,11 +263,11 @@ export function buildMusterPrintHtml(data: MusterPrintData, options?: { singlePa
     <div class="muster-total">Muster total: ${total}</div>
     <table>
       <colgroup>
-        ${single ? '<col style="width:36%"><col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:10%"><col style="width:36%">' : '<col style="width:28%"><col style="width:8%"><col style="width:8%"><col style="width:18%"><col style="width:6%"><col style="width:12%"><col style="width:20%">'}
+        ${single ? '<col style="width:28%"><col style="width:5%"><col style="width:5%"><col style="width:6%"><col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:8%"><col style="width:33%">' : '<col style="width:22%"><col style="width:6%"><col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:14%"><col style="width:5%"><col style="width:5%"><col style="width:5%"><col style="width:28%">' }
       </colgroup>
       <thead>
         <tr>
-          ${single ? '<th>Name</th><th>Cell</th><th>Sec</th><th>F</th><th>Hrs</th><th>Location</th>' : '<th>Name</th><th>Cell</th><th>Sec</th><th>Job</th><th>F</th><th>Hours</th><th>Location</th>'}
+          ${single ? '<th>Name</th><th>Cell</th><th>Sec</th><th>Cat</th><th>P</th><th>F</th><th>Hrs</th><th>Location</th>' : '<th>Name</th><th>Cell</th><th>Sec</th><th>Cat</th><th>P</th><th>Job</th><th>F</th><th>Hrs</th><th>Location</th>'}
         </tr>
       </thead>
       <tbody>${rows}</tbody>

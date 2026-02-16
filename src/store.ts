@@ -12,6 +12,7 @@ import type {
 } from './types'
 import { UNITS, DAILY_TASK_LABELS, FACILITY_OPTIONS, getUnitsForPrison } from './constants'
 import type { UnitId } from './types'
+import * as api from './api';
 
 const STORAGE_KEYS = {
   prisoners: 'prison-muster-prisoners',
@@ -80,6 +81,8 @@ export function savePrisoner(unitId: UnitId, prisoner: Prisoner): void {
   const next = idx >= 0 ? list.map((p) => (p.id === prisoner.id ? prisoner : p)) : [...list, prisoner]
   setPrisoners(unitId, next)
   addAuditEntry({ action: 'Prisoner saved', detail: `${prisoner.name || prisoner.cell} (${prisoner.id})`, unitId })
+  // Push to backend
+  api.savePrisoner(prisoner).catch(e => console.error('Failed to sync prisoner:', e));
 }
 
 export function deletePrisoner(unitId: UnitId, prisonerId: string): void {
@@ -132,6 +135,9 @@ export function setHandover(unitId: UnitId, date: string, data: HandoverSection)
     if (!byUnit[unitId]) byUnit[unitId] = {}
     byUnit[unitId][date] = data
     localStorage.setItem(STORAGE_KEYS.handover, JSON.stringify(byUnit))
+    // Push to backend
+    const payload = { ...data, unitId, date, id: `${unitId}-${date}` };
+    api.saveHandover(payload).catch(e => console.error('Failed to sync handover:', e));
   } catch (e) {
     console.error(e)
   }
@@ -152,17 +158,37 @@ export function getDailyTasks(unitId: UnitId, date: string): DailyTask[] {
 export function ensureDailyTasks(unitId: UnitId, date: string): DailyTask[] {
   let tasks = getDailyTasks(unitId, date)
   if (tasks.length === 0) {
+    // No tasks exist - create all from scratch
     tasks = DAILY_TASK_LABELS.map((label, i) => ({
       id: `task-${unitId}-${date}-${i}`,
       label,
       done: false,
-        unitId: unitId as any,
+      unitId: unitId as any,
       date,
     }))
     const raw = localStorage.getItem(STORAGE_KEYS.dailyTasks)
     const all: DailyTask[] = raw ? JSON.parse(raw) : []
     const rest = all.filter((t) => !(t.unitId === unitId && t.date === date))
     localStorage.setItem(STORAGE_KEYS.dailyTasks, JSON.stringify([...rest, ...tasks]))
+  } else {
+    // Tasks exist - check if any new labels need to be added
+    const existingLabels = new Set(tasks.map(t => t.label))
+    const newTasks = DAILY_TASK_LABELS
+      .filter(label => !existingLabels.has(label))
+      .map((label, i) => ({
+        id: `task-${unitId}-${date}-${tasks.length + i}`,
+        label,
+        done: false,
+        unitId: unitId as any,
+        date,
+      }))
+    if (newTasks.length > 0) {
+      const raw = localStorage.getItem(STORAGE_KEYS.dailyTasks)
+      const all: DailyTask[] = raw ? JSON.parse(raw) : []
+      const rest = all.filter((t) => !(t.unitId === unitId && t.date === date))
+      tasks = [...tasks, ...newTasks]
+      localStorage.setItem(STORAGE_KEYS.dailyTasks, JSON.stringify([...rest, ...tasks]))
+    }
   }
   return tasks
 }
@@ -173,6 +199,15 @@ export function toggleDailyTask(taskId: string): void {
   const all: DailyTask[] = JSON.parse(raw)
   const updated = all.map((t) => (t.id === taskId ? { ...t, done: !t.done } : t))
   localStorage.setItem(STORAGE_KEYS.dailyTasks, JSON.stringify(updated))
+  // Push to backend - use POST to create if not exists
+  const task = updated.find(t => t.id === taskId);
+  if (task) {
+    // First try to update, if fails create new
+    api.updateTask(task.id, task).catch(() => {
+      // If update fails, try to create
+      api.saveTask(task).catch(e => console.error('Failed to sync task:', e));
+    }).catch(e => console.error('Failed to sync task:', e));
+  }
 }
 
 // ——— Muster confirmation ———
@@ -198,8 +233,12 @@ export function setMusterConfirmation(unitId: UnitId, date: string, data: Partia
     unlock: data.unlock ?? existing?.unlock ?? false,
     random: data.random ?? existing?.random ?? false,
     lockup: data.lockup ?? existing?.lockup ?? false,
+    totalMustered: data.totalMustered ?? existing?.totalMustered,
+    musterdBy: data.musterdBy ?? existing?.musterdBy,
   }
   localStorage.setItem(STORAGE_KEYS.musterConfirm, JSON.stringify([...rest, next]))
+  // Push to backend
+  api.saveMuster(next).catch(e => console.error('Failed to sync muster:', e));
 }
 
 // ——— Cell alarms (weekly) ———
@@ -245,6 +284,13 @@ export function toggleCellAlarm(alarmId: string): void {
     a.id === alarmId ? { ...a, checked: !a.checked, checkedAt: new Date().toISOString() } : a
   )
   localStorage.setItem(STORAGE_KEYS.cellAlarms, JSON.stringify(updated))
+  // Push to backend - create if update fails
+  const alarm = updated.find(a => a.id === alarmId);
+  if (alarm) {
+    api.updateAlarm(alarm.id, alarm).catch(() => {
+      api.saveAlarm(alarm).catch(e => console.error('Failed to sync alarm:', e));
+    }).catch(e => console.error('Failed to sync alarm:', e));
+  }
 }
 
 // ——— Random searches ———
@@ -259,9 +305,9 @@ export function getSearchTargets(unitId: UnitId, date: string): SearchTarget[] {
   }
 }
 
-export function generateSearches(unitId: UnitId, date: string, cells: string[]): SearchTarget[] {
+export function generateSearches(unitId: UnitId, date: string, cells: string[], facilities?: string[]): SearchTarget[] {
   const cellsCopy = [...cells].filter(Boolean)
-  const facilities = [...FACILITY_OPTIONS]
+  const facilitiesList = facilities && facilities.length > 0 ? facilities : [...FACILITY_OPTIONS]
   const shuffle = <T,>(arr: T[]): T[] => {
     const a = [...arr]
     for (let i = a.length - 1; i > 0; i--) {
@@ -271,7 +317,7 @@ export function generateSearches(unitId: UnitId, date: string, cells: string[]):
     return a
   }
   const threeCells = shuffle(cellsCopy).slice(0, 3)
-  const twoFacilities = shuffle(facilities).slice(0, 2)
+  const twoFacilities = shuffle(facilitiesList).slice(0, 2)
   const targets: SearchTarget[] = [
     ...threeCells.map((value) => ({ type: 'cell' as const, value, unitId, date })),
     ...twoFacilities.map((value) => ({ type: 'facility' as const, value, unitId, date })),
@@ -649,13 +695,14 @@ export function initializeTemplateHubsForPrison(prisonId: string, date?: string)
   const units = getUnitsForPrison(prisonId)
   const initialized: string[] = []
   try {
-    // Batch-create missing daily tasks for all units, then write once.
+    // Batch-create or update daily tasks for all units
     const rawTasks = localStorage.getItem(STORAGE_KEYS.dailyTasks)
     const allTasks: DailyTask[] = rawTasks ? JSON.parse(rawTasks) : []
     const additions: DailyTask[] = []
     for (const u of units) {
-      const exists = allTasks.some((t) => t.unitId === u.id && t.date === d)
-      if (!exists) {
+      const existingTasks = allTasks.filter((t) => t.unitId === u.id && t.date === d)
+      if (existingTasks.length === 0) {
+        // No tasks exist - create all from scratch
         const tasks = DAILY_TASK_LABELS.map((label, i) => ({
           id: `task-${u.id}-${d}-${i}`,
           label,
@@ -664,6 +711,20 @@ export function initializeTemplateHubsForPrison(prisonId: string, date?: string)
           date: d,
         }))
         additions.push(...tasks)
+      } else {
+        // Tasks exist - check if any new labels need to be added
+        const existingLabels = new Set(existingTasks.map(t => t.label))
+        const newLabels = DAILY_TASK_LABELS.filter(label => !existingLabels.has(label))
+        if (newLabels.length > 0) {
+          const newTasks = newLabels.map((label, i) => ({
+            id: `task-${u.id}-${d}-${existingTasks.length + i}`,
+            label,
+            done: false,
+            unitId: u.id as any,
+            date: d,
+          }))
+          additions.push(...newTasks)
+        }
       }
     }
     if (additions.length > 0) {

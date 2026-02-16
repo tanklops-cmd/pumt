@@ -3,7 +3,7 @@ import type { AuditEntry } from './types'
 type StatusCb = (connected: boolean) => void
 
 export function subscribeAudit(onEntry: (entry: AuditEntry) => void, onStatus?: StatusCb) {
-  const url = (import.meta.env?.VITE_WS_URL as string) ?? 'ws://localhost:4000'
+  const url = (import.meta.env?.VITE_WS_URL as string) ?? 'ws://localhost:3001'
   let ws: WebSocket | null = null
   let closed = false
 

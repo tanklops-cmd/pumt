@@ -326,6 +326,8 @@ export function generateSearches(unitId: UnitId, date: string, cells: string[], 
   const all: SearchTarget[] = raw ? JSON.parse(raw) : []
   const rest = all.filter((s) => !(s.unitId === unitId && s.date === date))
   localStorage.setItem(STORAGE_KEYS.searchTargets, JSON.stringify([...rest, ...targets]))
+  // Push to backend
+  api.saveSearches(unitId, date, targets).catch(e => console.error('Failed to sync searches:', e));
   return targets
 }
 
@@ -375,6 +377,8 @@ export function setStripSearch(
     if (!byUnit[unitId]) byUnit[unitId] = {}
     byUnit[unitId][date] = { unitId, date, performed: data.performed, prisonerIds: data.prisonerIds || [] }
     localStorage.setItem(STORAGE_KEYS.stripSearch, JSON.stringify(byUnit))
+    // Push to backend
+    api.saveStripSearch({ unitId, date, performed: data.performed, prisonerIds: data.prisonerIds || [] }).catch(e => console.error('Failed to sync strip search:', e));
   } catch (e) {
     console.error(e)
   }
@@ -399,6 +403,8 @@ export function addAuditEntry(entry: Omit<AuditEntry, 'id' | 'timestamp'>): void
     timestamp: new Date().toISOString(),
   }
   localStorage.setItem(STORAGE_KEYS.audit, JSON.stringify([newEntry, ...all]))
+  // Push to backend
+  api.saveAuditEntry(entry).catch(e => console.error('Failed to sync audit entry:', e));
 }
 
 // ——— Control hub helpers ———
@@ -824,6 +830,8 @@ export function addUnitMaintenanceEntry(
     all.unshift(entry)
     localStorage.setItem(STORAGE_KEYS.unitMaintenance, JSON.stringify(all))
     addAuditEntry({ action: 'Maintenance entry added', detail: `${jobNumber} - ${jobDescription}`, unitId })
+    // Push to backend
+    api.saveMaintenance(entry).catch(e => console.error('Failed to sync maintenance entry:', e));
   } catch (e) {
     console.error('Failed to add maintenance entry', e)
   }
@@ -841,6 +849,8 @@ export function deleteUnitMaintenanceEntry(entryId: string): void {
     if (entry) {
       addAuditEntry({ action: 'Maintenance entry deleted', detail: `${entry.jobNumber} - ${entry.jobDescription}`, unitId: entry.unitId })
     }
+    // Push delete to backend
+    api.deleteMaintenance(entryId).catch(e => console.error('Failed to sync maintenance delete:', e));
   } catch (e) {
     console.error('Failed to delete maintenance entry', e)
   }
@@ -856,6 +866,11 @@ export function updateMaintenanceStatus(entryId: string, status: 'Logged' | 'Com
     const entry = all.find((e) => e.id === entryId)
     if (entry) {
       addAuditEntry({ action: `Maintenance ${status.toLowerCase()}`, detail: `${entry.jobNumber} - ${entry.jobDescription}`, unitId: entry.unitId })
+    }
+    // Push update to backend
+    const entryToUpdate = all.find((e) => e.id === entryId);
+    if (entryToUpdate) {
+      api.updateMaintenance(entryId, { ...entryToUpdate, status }).catch(e => console.error('Failed to sync maintenance update:', e));
     }
   } catch (e) {
     console.error('Failed to update maintenance status', e)

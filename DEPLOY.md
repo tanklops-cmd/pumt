@@ -47,7 +47,7 @@ cd backend && npm run dev
    ```bash
    cd backend && npm start
    ```
-7. **Access**: http://YOUR_LXC_IP:3001
+7. **Access**: http://192.168.1.73:3001
 
 ## Environment Variables
 
@@ -56,8 +56,33 @@ Create `backend/.env`:
 PORT=3001
 JWT_SECRET=your-secret-key
 VITE_API_URL=http://localhost:3001
+VITE_WS_URL=ws://localhost:3001
 VITE_ADMIN_PASSWORD=your-admin-password
 ```
+
+### Cloudflare Tunnel Configuration
+
+When using Cloudflare Tunnel, you need to set the correct URLs:
+
+1. **Build with environment variables:**
+```bash
+# Replace YOUR-TUNNEL-URL with your Cloudflare tunnel URL (e.g., https://your-app.cloudflared.io)
+VITE_API_URL=https://pumt.tw33dlestr33tle.org/ VITE_WS_URL=wss://pumt.tw33dlestr33tle.org npm run build
+```
+
+2. **Or create `.env.production` in project root:**
+```env
+VITE_API_URL=https://your-tunnel-url.com
+VITE_WS_URL=wss://your-tunnel-url.com
+VITE_ADMIN_PASSWORD=your-admin-password
+```
+
+3. **Then build:**
+```bash
+npm run build
+```
+
+**Note:** Cloudflare Tunnel supports WebSocket connections natively. Ensure your tunnel is configured to allow websockets (enabled by default in cloudflared).
 
 ## Notes
 

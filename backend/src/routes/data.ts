@@ -10,17 +10,14 @@ import { PrisonerInduction } from '../entity/PrisonerInduction';
 import { StripSearch } from '../entity/StripSearch';
 import { UnitConfig } from '../entity/UnitConfig';
 import { broadcastUpdate } from '../ws';
-import { dataSource } from '../index';
+import { getDataSource } from '../db';
 
 const router = Router();
-
-// Helper to get the shared DataSource
-const getDataSource = () => dataSource;
 
 // Helper to broadcast after any data change
 const broadcastChange = async () => {
   try {
-    const ds = dataSource;
+    const ds = getDataSource();
     if (!ds.isInitialized) await ds.initialize();
     
     const data = {
@@ -397,9 +394,13 @@ router.post('/searches', async (req, res: Response) => {
     // Create new
     const searches = req.body.targets || [req.body];
     for (const search of searches) {
-      const target = repo.create(search);
+      const target = repo.create({
+        ...search,
+        id: search.id || `search-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      });
       await repo.save(target);
     }
+    broadcastChange();
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving searches:', error);
@@ -451,10 +452,15 @@ router.post('/strip-search', async (req, res: Response) => {
     if (existing) {
       Object.assign(existing, req.body);
       await repo.save(existing);
+      broadcastChange();
       res.json(existing);
     } else {
-      const search = repo.create(req.body);
+      const search = repo.create({
+        ...req.body,
+        id: req.body.id || `strip-${unitId}-${date}`,
+      });
       await repo.save(search);
+      broadcastChange();
       res.status(201).json(search);
     }
   } catch (error) {

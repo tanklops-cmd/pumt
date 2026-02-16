@@ -3,23 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import { DataSource } from 'typeorm';
 import { createServer } from 'http';
-import { AuditRecord } from './entity/AuditRecord';
-import { Prisoner } from './entity/Prisoner';
-import { DailyTask } from './entity/DailyTask';
-import { MusterConfirmation } from './entity/MusterConfirmation';
-import { CellAlarm } from './entity/CellAlarm';
-import { HandoverSection } from './entity/HandoverSection';
-import { SearchTarget } from './entity/SearchTarget';
-import { UnitMaintenance } from './entity/UnitMaintenance';
-import { PrisonerInduction } from './entity/PrisonerInduction';
-import { StripSearch } from './entity/StripSearch';
-import { UnitConfig } from './entity/UnitConfig';
 import auditRoutes from './routes/audit';
 import authRoutes from './routes/auth';
 import dataRoutes from './routes/data';
 import { initWebSocket } from './ws';
+import { dataSource } from './db';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -27,26 +16,6 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-export const dataSource = new DataSource({
-  type: 'sqljs',
-  location: 'prison_muster.sql',
-  synchronize: true,
-  autoSave: true,
-  entities: [
-    AuditRecord,
-    Prisoner,
-    DailyTask,
-    MusterConfirmation,
-    CellAlarm,
-    HandoverSection,
-    SearchTarget,
-    UnitMaintenance,
-    PrisonerInduction,
-    StripSearch,
-    UnitConfig,
-  ],
-});
 
 dataSource.initialize()
   .then(() => console.log('Database connected (SQL.js)'))

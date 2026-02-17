@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { UNITS, getUnitsForPrison } from '../constants'
 import { getUnitMaintenanceEntries, addUnitMaintenanceEntry, deleteUnitMaintenanceEntry, updateMaintenanceStatus } from '../store'
 import type { UnitId, MaintenanceStatus } from '../types'
@@ -84,7 +84,7 @@ export default function UnitMaintenance() {
   }
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link to={prisonId ? `/prison/${prisonId}/unit/${id}` : `/unit/${id}`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
@@ -223,6 +223,6 @@ export default function UnitMaintenance() {
           </div>
         )}
       </div>
-    </Layout>
+</GlassLayout>
   )
 }

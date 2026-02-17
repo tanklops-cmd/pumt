@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { UNITS, getUnitsForPrison } from '../constants'
 import { getPrisonerInductions, addPrisonerInduction, notifyPCOForInduction } from '../store'
 import type { UnitId } from '../types'
@@ -63,7 +63,7 @@ export default function PrisonerInduction() {
   const allComplete = laundryNumberAdded && addedToJobsList
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/muster` : `/unit/${id}/muster`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Muster</Link>
@@ -286,6 +286,6 @@ export default function PrisonerInduction() {
           </div>
         )}
       </div>
-    </Layout>
+</GlassLayout>
   )
 }

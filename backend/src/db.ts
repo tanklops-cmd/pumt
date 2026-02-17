@@ -10,6 +10,7 @@ import { UnitMaintenance } from './entity/UnitMaintenance';
 import { PrisonerInduction } from './entity/PrisonerInduction';
 import { StripSearch } from './entity/StripSearch';
 import { UnitConfig } from './entity/UnitConfig';
+import { PrisonBriefing } from './entity/PrisonBriefing';
 
 export const dataSource = new DataSource({
   type: 'sqljs',
@@ -28,6 +29,7 @@ export const dataSource = new DataSource({
     PrisonerInduction,
     StripSearch,
     UnitConfig,
+    PrisonBriefing,
   ],
 });
 

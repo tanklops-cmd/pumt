@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { getAuditEntries, replaceAllPrisoners, addAuditEntry, listHubSnapshots, getHubSnapshot } from '../store'
 import type { AuditEntry } from '../types'
 import { ADMIN_PASSWORD } from '../constants'
@@ -54,7 +54,7 @@ export default function AdminHub() {
 
   if (!authenticated) {
     return (
-      <Layout>
+      <GlassLayout>
         <div className="max-w-md mx-auto card p-6">
           <h1 className="text-xl font-bold text-corrections-charcoal mb-2">Administration hub</h1>
           <p className="text-sm text-slate-600 mb-4">Enter the administration password to view the audit trail.</p>
@@ -77,7 +77,7 @@ export default function AdminHub() {
             </div>
           )}
         </div>
-      </Layout>
+      </GlassLayout>
     )
   }
 
@@ -116,7 +116,7 @@ export default function AdminHub() {
   }
 
   return (
-    <Layout>
+    <GlassLayout>
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <h1 className="text-2xl font-bold text-corrections-charcoal">Audit trail</h1>
         <div className="flex gap-2 flex-wrap">
@@ -191,6 +191,6 @@ export default function AdminHub() {
           <div className="p-8 text-center text-slate-500">No audit entries yet. Use the unit and muster pages to generate activity.</div>
         )}
       </div>
-    </Layout>
+    </GlassLayout>
   )
 }

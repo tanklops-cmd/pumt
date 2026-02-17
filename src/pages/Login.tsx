@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 
 // Login page kept for reference but no longer routed in the app
 // Authentication removed for demo purposes
@@ -17,7 +17,7 @@ export default function Login() {
   }
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="max-w-md mx-auto card p-6">
         <h1 className="text-xl font-bold text-corrections-charcoal mb-2">Sign in</h1>
         <p className="text-sm text-slate-600 mb-4">Authentication is not available in demo mode.</p>
@@ -40,6 +40,6 @@ export default function Login() {
           <button type="submit" className="btn-corrections w-full">Sign in</button>
         </form>
       </div>
-    </Layout>
+</GlassLayout>
   )
 }

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { UNITS } from '../constants'
 import { getAllUnitsSummary } from '../store'
 
@@ -14,7 +14,7 @@ export default function HomePage() {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-corrections-charcoal">Unit selection</h1>
         <p className="text-corrections-stone mt-1">Select a unit to view muster, handover, daily tasks and confirmations.</p>
@@ -50,6 +50,6 @@ export default function HomePage() {
           </Link>
         ))}
       </div>
-    </Layout>
+</GlassLayout>
   )
 }

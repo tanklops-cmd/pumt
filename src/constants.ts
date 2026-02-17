@@ -7,20 +7,28 @@ export const UNITS: Unit[] = [
   { id: 'centre', name: 'Centre Unit', shortName: 'Centre' },
 ]
 
-export const PRISONS: { id: string; name: string; shortName: string }[] = [
-  { id: 'invercargill', name: 'Invercargill Prison', shortName: 'Invercargill' },
-  { id: 'ocf', name: 'OCF', shortName: 'OCF' },
-  { id: 'christchurch-mens', name: 'Christchurch Mens Prison', shortName: 'Christchurch M' },
-  { id: 'rolleston', name: 'Rolleston Prison', shortName: 'Rolleston' },
-  { id: 'christchurch-womens', name: 'Christchurch Womens Prison', shortName: 'Christchurch W' },
-  { id: 'rimutaka', name: 'Rimutaka Prison', shortName: 'Rimutaka' },
-  { id: 'manawatu', name: 'Manawatu Prison', shortName: 'Manawatu' },
-  { id: 'auckland', name: 'Auckland Prison', shortName: 'Auckland' },
-  { id: 'mt-eden', name: 'Mt Eden', shortName: 'Mt Eden' },
-  { id: 'auckland-womens', name: 'Auckland Womens Prison', shortName: 'Auckland W' },
-  { id: 'spring-hill', name: 'Spring Hill Correctional Facility', shortName: 'Spring Hill' },
-  { id: 'nrfc', name: 'NRFC', shortName: 'NRFC' },
+export type Region = 'North Island' | 'South Island';
+
+export const PRISONS: { id: string; name: string; shortName: string; region: Region }[] = [
+  { id: 'invercargill', name: 'Invercargill Prison', shortName: 'Invercargill', region: 'South Island' },
+  { id: 'ocf', name: 'OCF', shortName: 'OCF', region: 'South Island' },
+  { id: 'christchurch-mens', name: 'Christchurch Mens Prison', shortName: 'Christchurch M', region: 'South Island' },
+  { id: 'rolleston', name: 'Rolleston Prison', shortName: 'Rolleston', region: 'South Island' },
+  { id: 'christchurch-womens', name: 'Christchurch Womens Prison', shortName: 'Christchurch W', region: 'South Island' },
+  { id: 'rimutaka', name: 'Rimutaka Prison', shortName: 'Rimutaka', region: 'North Island' },
+  { id: 'manawatu', name: 'Manawatu Prison', shortName: 'Manawatu', region: 'North Island' },
+  { id: 'auckland', name: 'Auckland Prison', shortName: 'Auckland', region: 'North Island' },
+  { id: 'mt-eden', name: 'Mt Eden', shortName: 'Mt Eden', region: 'North Island' },
+  { id: 'auckland-womens', name: 'Auckland Womens Prison', shortName: 'Auckland W', region: 'North Island' },
+  { id: 'spring-hill', name: 'Spring Hill Correctional Facility', shortName: 'Spring Hill', region: 'North Island' },
+  { id: 'nrfc', name: 'NRFC', shortName: 'NRFC', region: 'North Island' },
 ]
+
+export function getPrisonsByRegion() {
+  const north = PRISONS.filter(p => p.region === 'North Island');
+  const south = PRISONS.filter(p => p.region === 'South Island');
+  return { 'North Island': north, 'South Island': south };
+}
 
 /**
  * Return a list of units for a given prison. Invercargill uses the legacy UNITS list.

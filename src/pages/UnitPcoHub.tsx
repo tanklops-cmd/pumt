@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { getPrisoners, getAuditEntries, getDailyTasks, listHubSnapshots, getHubSnapshot, countIncompleteDailyTasks, getPrisonersPendingInductionNotification, markPrisonerInductionNotified } from '../store'
 import { UNITS, getUnitsForPrison } from '../constants'
 import type { UnitId, Prisoner } from '../types'
@@ -118,7 +118,7 @@ export default function UnitPcoHub() {
   const ccsPrisoners = prisoners.filter((p) => isCcsActive(p))
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <Link to={prisonId ? `/prison/${prisonId}/unit/${id}` : `/unit/${id}`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
@@ -388,6 +388,6 @@ export default function UnitPcoHub() {
           </div>
         </section>
       </div>
-    </Layout>
+</GlassLayout>
   )
 }

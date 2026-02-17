@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { getAllUnitsSummary, getUnitsSummaryForPrison, getControlHandover, setControlHandover, resetDailyTasksForDate, resetDailyTasksForPrison, getPrisoners, getAllPrisoners, unitsWithIncompleteTasksForPrison, unitsWithIncompleteTasksForAll } from '../store'
 import { PRISONS } from '../constants'
 import type { Prisoner } from '../types'
@@ -88,7 +88,7 @@ export default function ControlHub() {
   }
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <Link to={prisonId ? `/prison/${prisonId}` : '/'} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {prisonId ? 'Back to units' : 'Unit selection'}</Link>
@@ -235,6 +235,6 @@ export default function ControlHub() {
           </div>
         </section>
       </div>
-    </Layout>
+</GlassLayout>
   )
 }

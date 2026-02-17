@@ -9,6 +9,7 @@ import { UnitMaintenance } from '../entity/UnitMaintenance';
 import { PrisonerInduction } from '../entity/PrisonerInduction';
 import { StripSearch } from '../entity/StripSearch';
 import { UnitConfig } from '../entity/UnitConfig';
+import { PrisonBriefing } from '../entity/PrisonBriefing';
 import { broadcastUpdate } from '../ws';
 import { getDataSource } from '../db';
 
@@ -709,6 +710,52 @@ router.delete('/unit-config/:unitId', async (req, res: Response) => {
   } catch (error) {
     console.error('Error deleting unit config:', error);
     res.status(500).json({ error: 'Failed to delete unit config' });
+  }
+});
+
+// ==================== PRISON BRIEFING ====================
+
+router.get('/briefing/:prisonId', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(PrisonBriefing);
+    const briefing = await repo.findOneBy({ prisonId: req.params.prisonId });
+    if (!briefing) {
+      res.json({ prisonId: req.params.prisonId, title: '', content: '', postedBy: '' });
+      return;
+    }
+    res.json(briefing);
+  } catch (error) {
+    console.error('Error fetching briefing:', error);
+    res.status(500).json({ error: 'Failed to fetch briefing' });
+  }
+});
+
+router.post('/briefing', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(PrisonBriefing);
+    const { prisonId, title, content, postedBy } = req.body;
+    
+    const existing = await repo.findOneBy({ prisonId });
+    if (existing) {
+      existing.title = title || '';
+      existing.content = content || '';
+      existing.postedBy = postedBy || '';
+      await repo.save(existing);
+      broadcastChange();
+      res.json(existing);
+    } else {
+      const briefing = repo.create({ prisonId, title: title || '', content: content || '', postedBy: postedBy || '' });
+      await repo.save(briefing);
+      broadcastChange();
+      res.status(201).json(briefing);
+    }
+  } catch (error) {
+    console.error('Error saving briefing:', error);
+    res.status(500).json({ error: 'Failed to save briefing' });
   }
 });
 

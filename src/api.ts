@@ -448,3 +448,30 @@ export async function deleteUnitConfig(unitId: string): Promise<void> {
   });
   if (!response.ok) throw new Error('Failed to delete unit config');
 }
+
+// ==================== PRISON BRIEFING ====================
+
+export interface PrisonBriefing {
+  prisonId: string;
+  title: string;
+  content: string;
+  postedBy: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export async function fetchPrisonBriefing(prisonId: string): Promise<PrisonBriefing> {
+  const response = await fetch(`${API_BASE}/api/data/briefing/${prisonId}`);
+  if (!response.ok) throw new Error('Failed to fetch prison briefing');
+  return response.json();
+}
+
+export async function savePrisonBriefing(briefing: PrisonBriefing): Promise<PrisonBriefing> {
+  const response = await fetch(`${API_BASE}/api/data/briefing`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(briefing),
+  });
+  if (!response.ok) throw new Error('Failed to save prison briefing');
+  return response.json();
+}

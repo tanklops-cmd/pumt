@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import PrisonSelector from './pages/PrisonSelector'
 import UnitSelection from './pages/UnitSelection'
@@ -13,16 +13,22 @@ import ScoHub from './pages/ScoHub'
 import UnitMaintenance from './pages/UnitMaintenance'
 import PrisonerInduction from './pages/PrisonerInduction'
 import { useSync } from './sync'
+import SplashScreen from './SplashScreen'
 
 export default function App() {
   const { startAutoSync, isOnline, refresh, isSyncing } = useSync()
   const [showSyncBtn, setShowSyncBtn] = useState(false)
+  const [showSplash, setShowSplash] = useState(true)
+  const location = useLocation()
   
+  // Only show splash on home page
+  const showSplashScreen = showSplash && location.pathname === '/'
+
   useEffect(() => {
-    if (isOnline) {
+    if (isOnline && !showSplash) {
       startAutoSync()
     }
-  }, [isOnline, startAutoSync])
+  }, [isOnline, startAutoSync, showSplash])
 
   // Show sync button if data might be stale
   useEffect(() => {
@@ -31,6 +37,11 @@ export default function App() {
     }, 10000)
     return () => clearInterval(interval)
   }, [])
+
+  // Show splash screen only on home page
+  if (showSplashScreen) {
+return <SplashScreen onComplete={() => setShowSplash(false)} duration={2000} />
+  }
 
   return (
     <Routes>

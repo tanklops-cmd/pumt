@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { UNITS } from '../constants'
 import type { UnitId } from '../types'
 import { fetchUnitConfig, saveUnitConfig, type UnitConfig } from '../api'
@@ -161,17 +161,17 @@ export default function UnitConfigPage() {
 
   if (!authenticated) {
     return (
-      <Layout>
+<GlassLayout>
         <div className="max-w-md mx-auto card p-6">
           <h1 className="text-xl font-bold text-corrections-charcoal mb-2">Administration Required</h1>
           <p className="text-sm text-slate-600">Please log in as admin to configure units.</p>
         </div>
-      </Layout>
+</GlassLayout>
     )
   }
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-corrections-charcoal">Unit Configuration</h1>
         <p className="text-sm text-slate-600">Configure cells and facilities for each unit</p>
@@ -410,6 +410,6 @@ export default function UnitConfigPage() {
           </span>
         )}
       </div>
-    </Layout>
+</GlassLayout>
   )
 }

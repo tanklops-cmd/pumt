@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { getAuditEntries, listHubSnapshots, getHubSnapshot } from '../store'
 import { UNITS, getUnitsForPrison } from '../constants'
 import type { AuditEntry } from '../types'
@@ -64,7 +64,7 @@ export default function AuditHub() {
   const loadSnapshot = (unitId: string, date: string) => setLoadedSnapshot(getHubSnapshot(unitId as any, date))
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-6 flex items-center justify-between">
         <div>
           <Link to={prisonId ? `/prison/${prisonId}` : '/'} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {prisonId ? 'Back to units' : 'Unit selection'}</Link>
@@ -183,6 +183,6 @@ export default function AuditHub() {
           </div>
         </section>
       </div>
-    </Layout>
+</GlassLayout>
   )
 }

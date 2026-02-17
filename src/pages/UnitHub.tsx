@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { UNITS, getUnitsForPrison } from '../constants'
 import type { UnitId } from '../types'
 import {
@@ -197,7 +197,7 @@ export default function UnitHub() {
   }
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link to={prisonId ? `/prison/${prisonId}` : '/'} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← All units</Link>
@@ -583,7 +583,7 @@ export default function UnitHub() {
           </div>
         </div>
       )}
-    </Layout>
+</GlassLayout>
   )
 }
 

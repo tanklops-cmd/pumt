@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Layout from '../Layout'
+import GlassLayout from '../components/GlassLayout'
 import { UNITS, getUnitsForPrison, LOCATION_OPTIONS, JOB_OPTIONS, SECURITY_OPTIONS, JOB_MANUAL_ENTRY, JOB_FIXED_VALUES, CATEGORY_OPTIONS } from '../constants'
 import type { UnitId } from '../types'
 import type { Prisoner, SecurityClassification, LocationCode, PrisonerCategory } from '../types'
@@ -262,7 +262,7 @@ export default function MusterPage() {
   }
 
   return (
-    <Layout>
+<GlassLayout>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link to={prisonId ? `/prison/${prisonId}/unit/${id}` : `/unit/${id}`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
@@ -402,25 +402,25 @@ export default function MusterPage() {
             <col style={{ width: '40px' }} />
             <col style={{ width: '40px' }} />
             <col style={{ width: 'auto' }} />
-            <col style={{ width: '70px' }} />
             <col style={{ width: '60px' }} />
-            <col style={{ width: '80px' }} />
-            <col style={{ width: '55px' }} />
-            <col style={{ width: '100px' }} />
-            <col style={{ width: '120px' }} />
-            <col style={{ width: '45px' }} />
-            <col style={{ width: '45px' }} />
-            <col style={{ width: '45px' }} />
-            <col style={{ width: '80px' }} />
+            <col style={{ width: '50px' }} />
+            <col style={{ width: '50px' }} />
+            <col style={{ width: '40px' }} />
+            <col style={{ width: 'auto' }} />
+            <col style={{ width: 'auto' }} />
+            <col style={{ width: '40px' }} />
+            <col style={{ width: '40px' }} />
+            <col style={{ width: '40px' }} />
+            <col style={{ width: '60px' }} />
+            <col style={{ width: '60px' }} />
             <col style={{ width: '70px' }} />
-            <col style={{ width: '100px' }} />
           </colgroup>
           <thead>
             <tr className="bg-corrections-blue text-white">
-              <th className="text-left p-2">B</th>
-              <th className="text-left p-2">L</th>
-              <th className="text-left p-2">D</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '180px' }}>
+              <th className="text-left p-1">B</th>
+              <th className="text-left p-1">L</th>
+              <th className="text-left p-1">D</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '140px' }}>
                 <label className="inline-flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -431,18 +431,18 @@ export default function MusterPage() {
                   <span>Name</span>
                 </label>
               </th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '60px' }}>Cell</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '60px' }}>Sec</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '60px' }}>Cat</th>
-              <th className="text-left p-2 w-10">P</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '90px' }}>Job</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '100px' }}>Notes</th>
-              <th className="text-left p-2 w-10">OPs</th>
-              <th className="text-left p-2 w-10">CCs</th>
-              <th className="text-left p-2 w-10">NT</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '90px' }}>Hours out</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '70px' }}>Location</th>
-              <th className="text-left p-2 whitespace-nowrap" style={{ minWidth: '120px' }}>Actions</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '50px' }}>Cell</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '45px' }}>Sec</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '45px' }}>Cat</th>
+              <th className="text-left p-1 w-8">P</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '70px' }}>Job</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '80px' }}>Notes</th>
+              <th className="text-left p-1 w-8">OPs</th>
+              <th className="text-left p-1 w-8">CCs</th>
+              <th className="text-left p-1 w-8">NT</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '60px' }}>Hours</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '55px' }}>Loc</th>
+              <th className="text-left p-1 whitespace-nowrap" style={{ minWidth: '80px' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -603,7 +603,7 @@ export default function MusterPage() {
           <div className="p-8 text-center text-slate-500">No prisoners in muster. Add one to get started.</div>
         )}
       </div>
-    </Layout>
+</GlassLayout>
   )
 }
 

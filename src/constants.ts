@@ -33,14 +33,17 @@ export function getPrisonsByRegion() {
 /**
  * Return a list of units for a given prison. Invercargill uses the legacy UNITS list.
  * Other prisons receive 12 placeholder units named Unit 1..12 with ids namespaced by prison id.
+ * Each prison also has an ISU (Intensive Support Unit).
  */
 export function getUnitsForPrison(prisonId: string) {
   const base = prisonId
   if (prisonId === 'invercargill') {
-    // legacy units used by the app
-    return UNITS
+    // legacy units used by the app - add ISU at the beginning
+    return [{ id: 'invercargill-isu', name: 'ISU', shortName: 'ISU' }, ...UNITS]
   }
   const units = [] as { id: string; name: string; shortName: string }[]
+  // Add ISU (Intensive Support Unit) for each prison
+  units.push({ id: `${base}-isu`, name: 'ISU', shortName: 'ISU' })
   for (let i = 1; i <= 12; i++) {
     const id = `${base}-unit-${i}`
     units.push({ id, name: `Unit ${i}`, shortName: `U${i}` })

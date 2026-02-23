@@ -12,6 +12,16 @@ import ControlHub from './pages/ControlHub'
 import ScoHub from './pages/ScoHub'
 import UnitMaintenance from './pages/UnitMaintenance'
 import PrisonerInduction from './pages/PrisonerInduction'
+import IsuHub from './pages/IsuHub'
+import IsuObservations from './pages/IsuObservations'
+import HowToUse from './pages/HowToUse'
+import BriefingHistory from './pages/BriefingHistory'
+import Forms from './pages/Forms'
+import OffenderForms from './pages/OffenderForms'
+import StaffForms from './pages/StaffForms'
+import PrisonerKiosk from './pages/PrisonerKiosk'
+import StaffRequests from './pages/StaffRequests'
+import PcoRequests from './pages/PcoRequests'
 import { useSync } from './sync'
 import SplashScreen from './SplashScreen'
 
@@ -25,7 +35,9 @@ export default function App() {
   const showSplashScreen = showSplash && location.pathname === '/'
 
   useEffect(() => {
-    if (isOnline && !showSplash) {
+    // Start sync when online, regardless of splash screen state
+    // This ensures data loads even when navigating directly to a unit page
+    if (isOnline) {
       startAutoSync()
     }
   }, [isOnline, startAutoSync, showSplash])
@@ -40,7 +52,7 @@ export default function App() {
 
   // Show splash screen only on home page
   if (showSplashScreen) {
-return <SplashScreen onComplete={() => setShowSplash(false)} duration={2000} />
+    return <SplashScreen onComplete={() => setShowSplash(false)} duration={2000} />
   }
 
   return (
@@ -48,6 +60,13 @@ return <SplashScreen onComplete={() => setShowSplash(false)} duration={2000} />
       <Route path="/" element={<PrisonSelector />} />
       <Route path="/prison/:prisonId" element={<UnitSelection />} />
       <Route path="/prison/:prisonId/control" element={<ControlHub />} />
+      <Route path="/prison/:prisonId/isu" element={<IsuHub />} />
+      <Route path="/prison/:prisonId/isu/muster" element={<MusterPage />} />
+      <Route path="/prison/:prisonId/isu/observations" element={<IsuObservations />} />
+      <Route path="/prison/:prisonId/isu/pco" element={<UnitPcoHub />} />
+      {/* Legacy ISU route for invercargill */}
+      <Route path="/isu" element={<IsuHub />} />
+      <Route path="/isu/observations" element={<IsuObservations />} />
       <Route path="/prison/:prisonId/unit/:unitId" element={<UnitHub />} />
       <Route path="/prison/:prisonId/unit/:unitId/muster" element={<MusterPage />} />
       <Route path="/prison/:prisonId/unit/:unitId/pco" element={<UnitPcoHub />} />
@@ -66,6 +85,18 @@ return <SplashScreen onComplete={() => setShowSplash(false)} duration={2000} />
       <Route path="/audit" element={<AuditHub />} />
       <Route path="/prison/:prisonId/audit" element={<AuditHub />} />
       <Route path="/unit-config" element={<UnitConfigPage />} />
+      <Route path="/forms" element={<Forms />} />
+      <Route path="/forms/offender" element={<OffenderForms />} />
+      <Route path="/forms/staff" element={<StaffForms />} />
+      <Route path="/how-to-use" element={<HowToUse />} />
+      <Route path="/briefings" element={<BriefingHistory />} />
+      
+      {/* Prisoner Self-Service Requests */}
+      <Route path="/prisoner-request" element={<PrisonerKiosk />} />
+      <Route path="/prison/:prisonId/prisoner-request" element={<PrisonerKiosk />} />
+      <Route path="/prison/:prisonId/unit/:unitId/prisoner-request" element={<PrisonerKiosk />} />
+      <Route path="/prison/:prisonId/unit/:unitId/requests" element={<StaffRequests />} />
+      <Route path="/prison/:prisonId/unit/:unitId/pco/requests" element={<PcoRequests />} />
     </Routes>
   )
 }

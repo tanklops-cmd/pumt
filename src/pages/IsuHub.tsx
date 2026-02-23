@@ -34,9 +34,15 @@ function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function UnitHub() {
+export default function IsuHub() {
   const { prisonId, unitId } = useParams<{ prisonId?: string; unitId?: string }>()
-  const id = (unitId ?? 'north') as UnitId
+  // For legacy route (/isu), use 'invercargill-isu' as the unitId
+  // For prison routes, use the unitId from params or construct ISU id from prisonId
+  const id = unitId 
+    ? (unitId as UnitId)
+    : prisonId 
+      ? `${prisonId}-isu` as UnitId
+      : 'invercargill-isu' as UnitId
   
   // find unit in prison-specific units if prisonId supplied, otherwise fall back to legacy UNITS
   const unitsToSearch = prisonId ? getUnitsForPrison(prisonId) : UNITS
@@ -127,13 +133,13 @@ export default function UnitHub() {
     const next = { ...handover, [field]: value }
     setHandoverState(next)
     setHandover(id, today(), next)
-    addAuditEntry({ action: 'Handover updated', detail: field, unitId: id })
+    addAuditEntry({ action: 'ISU Handover updated', detail: field, unitId: id })
   }
 
   const handleToggleTask = (taskId: string) => {
     toggleDailyTask(taskId)
     setTasks(ensureDailyTasks(id, today()))
-    addAuditEntry({ action: 'Daily task toggled', unitId: id })
+    addAuditEntry({ action: 'ISU Daily task toggled', unitId: id })
   }
 
   const handleMusterConfirm = (key: 'unlock' | 'random' | 'lockup', value: boolean) => {
@@ -158,7 +164,7 @@ export default function UnitHub() {
       setTotalMustered('')
     } else {
       setMusterConfirmation(id, today(), { [key]: value })
-      addAuditEntry({ action: `Muster ${key} confirmed`, detail: 'No', unitId: id })
+      addAuditEntry({ action: `ISU Muster ${key} confirmed`, detail: 'No', unitId: id })
       setMuster(getMusterConfirmation(id, today()))
     }
   }
@@ -186,7 +192,7 @@ export default function UnitHub() {
       totalMustered: total,
       musterdBy: staffStr,
     })
-    addAuditEntry({ action: `Muster ${musterModal.key} confirmed`, detail: `${total} prisoners by ${staffStr}`, unitId: id })
+    addAuditEntry({ action: `ISU Muster ${musterModal.key} confirmed`, detail: `${total} prisoners by ${staffStr}`, unitId: id })
     setMuster(getMusterConfirmation(id, today()))
     setMusterModal(null)
   }
@@ -201,7 +207,7 @@ export default function UnitHub() {
   const handleToggleAlarm = (alarmId: string) => {
     toggleCellAlarm(alarmId)
     setAlarms(getCellAlarms(id))
-    addAuditEntry({ action: 'Cell alarm checked', unitId: id })
+    addAuditEntry({ action: 'ISU Cell alarm checked', unitId: id })
   }
 
   const handleGenerateSearches = () => {
@@ -217,14 +223,14 @@ export default function UnitHub() {
     
     const generated = generateSearches(id, today(), searchCells, searchFacilities)
     setSearches(generated)
-    addAuditEntry({ action: 'Daily searches generated', detail: `${generated.length} targets (3 cells, 2 facilities)`, unitId: id })
+    addAuditEntry({ action: 'ISU Daily searches generated', detail: `${generated.length} targets (3 cells, 2 facilities)`, unitId: id })
   }
 
   const handleStripSearchPerformed = (performed: boolean) => {
     const next = { performed, prisonerIds: performed ? (stripSearch?.prisonerIds ?? []) : [] }
     setStripSearch(id, today(), next)
     setStripSearchState(getStripSearch(id, today()))
-    addAuditEntry({ action: 'Strip search updated', detail: performed ? 'Yes' : 'No', unitId: id })
+    addAuditEntry({ action: 'ISU Strip search updated', detail: performed ? 'Yes' : 'No', unitId: id })
   }
 
   const handleStripSearchPrisonerToggle = (prisonerId: string, selected: boolean) => {
@@ -232,7 +238,7 @@ export default function UnitHub() {
     const next = selected ? [...current, prisonerId] : current.filter((id) => id !== prisonerId)
     setStripSearch(id, today(), { performed: true, prisonerIds: next })
     setStripSearchState(getStripSearch(id, today()))
-    addAuditEntry({ action: 'Strip search prisoner', detail: prisonerId, unitId: id })
+    addAuditEntry({ action: 'ISU Strip search prisoner', detail: prisonerId, unitId: id })
   }
 
   return (
@@ -240,17 +246,18 @@ export default function UnitHub() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <Link to={prisonId ? `/prison/${prisonId}` : '/'} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← All units</Link>
-          <h1 className="text-2xl font-bold text-corrections-charcoal">{unit.name} Hub</h1>
+          <h1 className="text-2xl font-bold text-corrections-charcoal">ISU Hub</h1>
+          <p className="text-sm text-slate-600">Intensive Support Unit</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to={prisonId ? `/prison/${prisonId}/isu/observations` : `/isu/observations`} className="btn-outline">
+            Observations
+          </Link>
           <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/maintenance` : `/unit/${id}/maintenance`} className="btn-outline">
             Unit Maintenance
           </Link>
-          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/pco` : `/unit/${id}/pco`} className="btn-outline">
+          <Link to={prisonId ? `/prison/${prisonId}/isu/pco` : `/unit/${id}/pco`} className="btn-outline">
             Principal Corrections Officer Hub
-          </Link>
-          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/requests` : `/unit/${id}/requests`} className="btn-outline">
-            Request Management
           </Link>
           <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/muster` : `/unit/${id}/muster`} className="btn-corrections">
             View / Edit Muster
@@ -260,7 +267,7 @@ export default function UnitHub() {
             onClick={async () => {
               try {
                 const { capturePageState } = await import('../usePageCapture');
-                const result = await capturePageState({ pageName: 'UnitHub', unitId: id });
+                const result = await capturePageState({ pageName: 'IsuHub', unitId: id });
                 if (result) {
                   alert('Page state saved to audit trail!');
                 } else {
@@ -281,12 +288,12 @@ export default function UnitHub() {
         {/* Handover */}
         <section className="card">
           <div className="px-4 py-3 bg-corrections-blue text-white font-semibold flex items-center justify-between">
-            <span>Handover information</span>
+            <span>ISU Handover information</span>
             <button
               type="button"
               onClick={() => {
                 const html = buildHandoverPrintHtml({
-                  unitName: unit.name,
+                  unitName: 'ISU',
                   date: today(),
                   standingOrders: handover.standingOrders,
                   medicalNotes: handover.medicalNotes,
@@ -297,7 +304,7 @@ export default function UnitHub() {
                   co2Name: handover.co2Name,
                   co3Name: handover.co3Name,
                 })
-                openPrintWindow(html, `${unit.name} Handover`)
+                openPrintWindow(html, `ISU Handover`)
               }}
               className="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded text-sm font-medium"
             >
@@ -344,12 +351,12 @@ export default function UnitHub() {
           </div>
         </section>
 
-        {/* Unit Muster Total */}
+        {/* ISU Muster Total */}
         <section className="card">
-          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">Unit Muster Total</div>
+          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">ISU Muster Total</div>
           <div className="p-4">
             <div className="text-4xl font-bold text-corrections-charcoal">{prisoners.length}</div>
-            <p className="text-sm text-slate-600 mt-1">prisoners in unit</p>
+            <p className="text-sm text-slate-600 mt-1">prisoners in ISU</p>
             
             {/* Category Breakdown */}
             {(() => {
@@ -430,7 +437,7 @@ export default function UnitHub() {
 
         {/* Daily tasks */}
         <section className="card">
-          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">SCO Checklist</div>
+          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">ISU SCO Checklist</div>
           <div className="p-4">
             <ul className="space-y-2">
               {tasks.map((task) => (
@@ -460,7 +467,7 @@ export default function UnitHub() {
 
         {/* Muster confirmation */}
         <section className="card">
-          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">Muster confirmation</div>
+          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">ISU Muster confirmation</div>
           <div className="p-4">
             <div className="flex flex-wrap gap-3 mb-3">
               {(['unlock', 'random', 'lockup'] as const).map((key) => {
@@ -572,12 +579,12 @@ export default function UnitHub() {
         {/* Daily Cell and Facilities Check — 5 searches */}
         <section className="card">
           <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">
-            Daily Cell and Facilities Check
+            ISU Daily Cell and Facilities Check
           </div>
           <div className="p-4">
             <p className="text-xs text-slate-500 mb-3">3 random cells + 2 facilities = 5 searches</p>
             {searches.length === 0 ? (
-              <p className="text-sm text-slate-600 mb-3">Generate today’s random searches.</p>
+              <p className="text-sm text-slate-600 mb-3">Generate today's random searches.</p>
             ) : (
               <ul className="space-y-2 mb-3">
                 {searches.map((s, i) => (
@@ -644,7 +651,7 @@ export default function UnitHub() {
 
         {/* Weekly cell alarms */}
         <section className="card lg:col-span-2">
-          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">Weekly cell alarms</div>
+          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">ISU Cell alarms</div>
           <div className="p-4">
             {alarms.length === 0 ? (
               <p className="text-sm text-slate-600">No cells in muster. Add prisoners in Muster to see cell alarms.</p>
@@ -673,10 +680,10 @@ export default function UnitHub() {
         </section>
         {/* Movement log (unit) — placed under weekly cell alarms */}
         <section className="card lg:col-span-2">
-          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">Movement log (unit)</div>
+          <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">ISU Movement log</div>
           <div className="p-4">
-            <p className="text-xs text-slate-500 mb-3">Recent movement and location updates for this unit.</p>
-            <UnitMovementList unitId={id} />
+            <p className="text-xs text-slate-500 mb-3">Recent movement and location updates for ISU.</p>
+            <IsuMovementList unitId={id} />
           </div>
         </section>
       </div>
@@ -685,7 +692,7 @@ export default function UnitHub() {
       {musterModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="font-semibold text-lg mb-3 capitalize">Confirm {musterModal.key} muster</h3>
+            <h3 className="font-semibold text-lg mb-3 capitalize">Confirm ISU {musterModal.key} muster</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Total mustered</label>
@@ -748,7 +755,7 @@ export default function UnitHub() {
   )
 }
 
-function UnitMovementList({ unitId }: { unitId: string }) {
+function IsuMovementList({ unitId }: { unitId: string }) {
   const [entries, setEntries] = useState(() => getAuditEntries().filter((e) => e.unitId === unitId && isMovementAction(e.action)))
 
   useEffect(() => {
@@ -778,7 +785,7 @@ function UnitMovementList({ unitId }: { unitId: string }) {
   return (
     <div>
       {entries.length === 0 ? (
-        <div className="text-sm text-slate-500">No recent movement entries for this unit.</div>
+        <div className="text-sm text-slate-500">No recent movement entries for ISU.</div>
       ) : (
         <ul className="text-sm space-y-2 max-h-48 overflow-y-auto">
           {entries.map((e) => (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams, useLocation } from 'react-router-dom'
 import GlassLayout from '../components/GlassLayout'
 import { UNITS, getUnitsForPrison, LOCATION_OPTIONS, JOB_OPTIONS, SECURITY_OPTIONS, JOB_MANUAL_ENTRY, JOB_FIXED_VALUES, CATEGORY_OPTIONS } from '../constants'
 import type { UnitId } from '../types'
@@ -10,6 +10,7 @@ import {
   deletePrisoner,
   movePrisonerToUnit,
   addAuditEntry,
+  createSacraReminder,
 } from '../store'
 import { openPrintPreviewWindow, buildMusterPrintHtml, getOutOfUnitHours } from '../printUtils'
 
@@ -99,7 +100,24 @@ function newPrisoner(unitId: UnitId): Prisoner {
 
 export default function MusterPage() {
   const { prisonId, unitId } = useParams<{ prisonId?: string; unitId?: string }>()
-  const id = (unitId ?? 'north') as UnitId
+  const location = useLocation()
+  
+  // For legacy route (/unit/:unitId/muster), default to 'north'
+  // For prison routes with ISU (/prison/:prisonId/isu/muster), use ISU unit ID
+  // For other prison routes, default to first unit
+  let id: UnitId
+  if (unitId) {
+    id = unitId as UnitId
+  } else if (prisonId) {
+    // Check if this is an ISU route by checking if the URL contains '/isu/'
+    if (location.pathname.includes('/isu/')) {
+      id = `${prisonId}-isu` as UnitId
+    } else {
+      id = `${prisonId}-unit-1` as UnitId  // Default to first unit for prison-based muster
+    }
+  } else {
+    id = 'north' as UnitId
+  }
   const unitsToSearch = prisonId ? getUnitsForPrison(prisonId) : UNITS
   const unit = unitsToSearch.find((u) => u.id === id) ?? (UNITS.find((u) => u.id === id) ?? unitsToSearch[0])
 
@@ -111,10 +129,44 @@ export default function MusterPage() {
   const [moveModal, setMoveModal] = useState<{ prisonerIds: string[] } | null>(null)
   const [moveTargetUnit, setMoveTargetUnit] = useState<UnitId | ''>('')
   const [moveCellByPrisonerId, setMoveCellByPrisonerId] = useState<Record<string, string>>({})
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
     setPrisonersState(sortByLastName(getPrisoners(id)))
   }, [id])
+
+  // Listen for sync updates from backend
+  useEffect(() => {
+    const handleSync = () => {
+      setPrisonersState(sortByLastName(getPrisoners(id)))
+    }
+    window.addEventListener('data-synced', handleSync)
+    return () => window.removeEventListener('data-synced', handleSync)
+  }, [id])
+
+  // Track if we should auto-open induction for the currently editing prisoner
+  const [autoOpenInduction, setAutoOpenInduction] = useState(false)
+
+  // Handle query params for select and induction
+  useEffect(() => {
+    const selectParam = searchParams.get('select')
+    const inductionParam = searchParams.get('induction')
+    
+    if (selectParam) {
+      // Select the prisoner
+      setSelectedIds(new Set([selectParam]))
+      // Open edit mode for this prisoner
+      setEditingId(selectParam)
+      
+      // If induction=true, auto-open induction section
+      if (inductionParam === 'true') {
+        setAutoOpenInduction(true)
+      }
+      
+      // Clear the query params after processing
+      setSearchParams({})
+    }
+  }, [searchParams, setSearchParams])
 
   const save = (p: Prisoner, skipCcsCheck = false) => {
     // Check if CCs is being enabled - prompt user about AT RISK (skip if already checked in EditRow)
@@ -165,21 +217,34 @@ export default function MusterPage() {
   const applyMove = () => {
     if (!moveTargetUnit || moveTargetUnit === id) return
     const targetId = moveTargetUnit as UnitId
+    const targetUnit = otherUnits.find(u => u.id === targetId)
+    const targetUnitName = targetUnit?.name || targetId
+    const currentUnitName = unit.name
     const ids = moveModal?.prisonerIds ?? []
+    
     ids.forEach((pid) => {
+      const prisoner = prisoners.find((x) => x.id === pid)
+      const prisonerName = prisoner?.name || prisoner?.cell || pid
+      
       movePrisonerToUnit(id, pid, targetId)
       const newCell = (moveCellByPrisonerId[pid] ?? '').trim()
       if (newCell) {
         const list = getPrisoners(targetId)
         const p = list.find((x) => x.id === pid)
-        if (p) savePrisoner(targetId, { ...p, cell: newCell })
+        if (p) savePrisoner(targetId, { ...p, cell: newCell, moveToUnitNotified: false })
+      } else {
+        // Update the moved prisoner to set moveToUnitNotified to false
+        const list = getPrisoners(targetId)
+        const p = list.find((x) => x.id === pid)
+        if (p) savePrisoner(targetId, { ...p, moveToUnitNotified: false })
       }
       addAuditEntry({
         action: 'Prisoner moved to unit',
-        detail: `${prisoners.find((x) => x.id === pid)?.name || pid} → ${(moveCellByPrisonerId[pid] ?? '').trim() || 'cell TBC'}`,
+        detail: `${prisonerName} → ${(moveCellByPrisonerId[pid] ?? '').trim() || 'cell TBC'}`,
         unitId: targetId,
       })
     })
+    
     setPrisonersState(sortByLastName(getPrisoners(id)))
     setMoveModal(null)
     setMoveTargetUnit('')
@@ -261,14 +326,22 @@ export default function MusterPage() {
     }
   }
 
+  // Check if this is an ISU route
+  const isIsuRoute = location.pathname.includes('/isu/')
+
   return (
 <GlassLayout>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-4 md:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}` : `/unit/${id}`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
-          <h1 className="text-2xl font-bold text-corrections-charcoal">{unit.name} — Muster</h1>
+          <Link to={isIsuRoute 
+            ? (prisonId ? `/prison/${prisonId}/isu` : '/isu') 
+            : (prisonId ? `/prison/${prisonId}/unit/${id}` : `/unit/${id}`)
+          } className="text-corrections-blue hover:underline text-xs sm:text-sm mb-1 inline-block">
+            ← {unit.name} Hub
+          </Link>
+          <h1 className="text-xl md:text-2xl font-bold text-corrections-charcoal">{unit.name} — Muster</h1>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 sm:gap-2 w-full sm:w-auto overflow-x-auto">
           {selectedIds.size > 0 && (
             <>
               <button
@@ -395,25 +468,25 @@ export default function MusterPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-        <table className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+        <table className="w-full text-sm">
           <colgroup>
             <col style={{ width: '40px' }} />
             <col style={{ width: '40px' }} />
             <col style={{ width: '40px' }} />
-            <col style={{ width: 'auto' }} />
-            <col style={{ width: '60px' }} />
-            <col style={{ width: '50px' }} />
-            <col style={{ width: '50px' }} />
-            <col style={{ width: '40px' }} />
-            <col style={{ width: 'auto' }} />
-            <col style={{ width: 'auto' }} />
-            <col style={{ width: '40px' }} />
-            <col style={{ width: '40px' }} />
-            <col style={{ width: '40px' }} />
-            <col style={{ width: '60px' }} />
-            <col style={{ width: '60px' }} />
+            <col style={{ minWidth: '150px' }} />
             <col style={{ width: '70px' }} />
+            <col style={{ width: '60px' }} />
+            <col style={{ width: '60px' }} />
+            <col style={{ width: '45px' }} />
+            <col style={{ width: '90px' }} />
+            <col style={{ width: '120px' }} />
+            <col style={{ width: '45px' }} />
+            <col style={{ width: '45px' }} />
+            <col style={{ width: '45px' }} />
+            <col style={{ width: '70px' }} />
+            <col style={{ width: '70px' }} />
+            <col style={{ width: '80px' }} />
           </colgroup>
           <thead>
             <tr className="bg-corrections-blue text-white">
@@ -460,8 +533,11 @@ export default function MusterPage() {
                   <EditRow
                     prisoner={p}
                     onSave={save}
-                    onCancel={() => setEditingId(null)}
+                    onCancel={() => { setEditingId(null); setAutoOpenInduction(false) }}
                     onRemove={() => remove(p)}
+                    openInduction={editingId === p.id && autoOpenInduction}
+                    onInductionOpened={() => setAutoOpenInduction(false)}
+                    unitId={id}
                   />
                 ) : (
                   <>
@@ -612,11 +688,17 @@ function EditRow({
   onSave,
   onCancel,
   onRemove,
+  openInduction = false,
+  onInductionOpened,
+  unitId,
 }: {
   prisoner: Prisoner
   onSave: (p: Prisoner) => void
   onCancel: () => void
   onRemove: () => void
+  openInduction?: boolean
+  onInductionOpened?: () => void
+  unitId?: string
 }) {
   const [p, setP] = useState<Prisoner>({
     ...prisoner,
@@ -627,8 +709,50 @@ function EditRow({
   const initialJobIsManual = (prisoner.job ?? '') !== '' && !JOB_FIXED_VALUES.includes((prisoner.job ?? '') as (typeof JOB_FIXED_VALUES)[number])
   const [jobIsManualEntry, setJobIsManualEntry] = useState(initialJobIsManual)
   const [jobSelectValue, setJobSelectValue] = useState(initialJobIsManual ? JOB_MANUAL_ENTRY : (p.job ?? ''))
-  const [showInduction, setShowInduction] = useState(false)
+  const [showInduction, setShowInduction] = useState(openInduction)
+  const [sacraCellmateModal, setSacraCellmateModal] = useState<{ prisoner: Prisoner; sacraCompleted: boolean } | null>(null)
   
+  // Handle auto-open induction
+  useEffect(() => {
+    if (openInduction) {
+      setShowInduction(true)
+      onInductionOpened?.()
+    }
+  }, [openInduction])
+
+  // Handle SACRA checkbox change - prompt for cellmate if being enabled
+  const handleSacraChange = (checked: boolean) => {
+    // If turning on SACRA (and was not already on), prompt for cellmate
+    if (checked && !p.sacraCompleted) {
+      // Get same-cell prisoners (potential cellmates)
+      const sameCellPrisoners = getPrisoners(unitId as UnitId).filter(
+        other => other.cell === p.cell && other.id !== p.id
+      )
+      if (sameCellPrisoners.length > 0) {
+        // Show modal to select cellmate
+        setSacraCellmateModal({ prisoner: p, sacraCompleted: true })
+        return
+      }
+    }
+    setP({ ...p, sacraCompleted: checked })
+  }
+  
+  const handleCellmateSelect = (cellmateName: string) => {
+    // Create SACRA reminder
+    if (unitId && p.name && cellmateName) {
+      createSacraReminder(
+        unitId as UnitId,
+        p.name,
+        cellmateName,
+        p.id,
+        sacraCellmateModal?.prisoner.id || '',
+        p.cell || ''
+      )
+    }
+    setSacraCellmateModal(null)
+    setP({ ...p, sacraCompleted: true })
+  }
+
   const handleSave = () => {
     // Check if CCs is being enabled - prompt user about AT RISK
     if (p.ccs && !prisoner.ccs) {
@@ -636,6 +760,18 @@ function EditRow({
         return // User cancelled, don't save
       }
     }
+    
+    // Check if cell changed - log it for movement log
+    if (p.cell !== prisoner.cell && unitId) {
+      addAuditEntry({
+        action: 'Cell changed',
+        detail: `${prisoner.cell || '—'} → ${p.cell || '—'}`,
+        prisonerName: p.name || prisoner.cell,
+        prisonerLocation: 'CELL',
+        unitId: unitId as UnitId,
+      })
+    }
+    
     // If induction is complete, record the timestamp and mark as needing PCO notification
     if (p.laundryNumberAdded && p.addedToJobsList && !prisoner.laundryNumberAdded) {
       const updated = {
@@ -649,8 +785,62 @@ function EditRow({
     }
   }
   
+  // Get potential cellmates for the modal
+  const sameCellPrisoners = unitId ? getPrisoners(unitId as UnitId).filter(
+    other => other.cell === p.cell && other.id !== p.id
+  ) : []
+
   return (
     <>
+      {/* SACRA Cellmate Selection Modal */}
+      {sacraCellmateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="font-semibold text-lg mb-2">Select Cellmate for SACRA</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              {p.name || 'This prisoner'} has SACRA completed. Please select their cellmate to create a review reminder.
+            </p>
+            {sameCellPrisoners.length > 0 ? (
+              <ul className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                {sameCellPrisoners.map((cellmate) => (
+                  <li key={cellmate.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleCellmateSelect(cellmate.name || cellmate.cell)}
+                      className="w-full text-left px-4 py-3 rounded-lg border border-slate-200 hover:border-corrections-blue hover:bg-blue-50 transition-colors"
+                    >
+                      <div className="font-medium text-slate-900">{cellmate.name || 'Unnamed'}</div>
+                      <div className="text-sm text-slate-500">Cell: {cellmate.cell || '—'}</div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-500 mb-4">No other prisoners in the same cell found.</p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setSacraCellmateModal(null)}
+                className="btn-outline"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // Create reminder with "Unknown" cellmate if none selected
+                  handleCellmateSelect('Unknown')
+                }}
+                className="btn-corrections"
+              >
+                Continue without cellmate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <td colSpan={16} className="p-2 bg-slate-50">
         <div className="space-y-3">
           {/* Basic Info */}
@@ -821,7 +1011,7 @@ function EditRow({
                 <input
                   type="checkbox"
                   checked={!!p.sacraCompleted}
-                  onChange={(e) => setP({ ...p, sacraCompleted: e.target.checked })}
+                  onChange={(e) => handleSacraChange(e.target.checked)}
                   className="rounded border-corrections-blue text-corrections-blue"
                 />
                 <span className="text-sm font-medium text-slate-600">SACRA Completed (optional)</span>

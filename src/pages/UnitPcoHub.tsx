@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import GlassLayout from '../components/GlassLayout'
-import { getPrisoners, getAuditEntries, getDailyTasks, listHubSnapshots, getHubSnapshot, countIncompleteDailyTasks, getPrisonersPendingInductionNotification, markPrisonerInductionNotified } from '../store'
+import { getPrisoners, getAuditEntries, getDailyTasks, listHubSnapshots, getHubSnapshot, countIncompleteDailyTasks, getPrisonersPendingInductionNotification, markPrisonerInductionNotified, getPrisonersPendingMoveNotification, markPrisonerMoveNotified } from '../store'
 import { UNITS, getUnitsForPrison } from '../constants'
 import type { UnitId, Prisoner } from '../types'
 import { getOutOfUnitHours } from '../printUtils'
@@ -24,7 +24,11 @@ function isCcsActive(p: Prisoner): boolean {
 
 export default function UnitPcoHub() {
   const { prisonId, unitId } = useParams<{ prisonId?: string; unitId?: string }>()
-  const id = (unitId ?? 'north') as UnitId
+  // Handle ISU routes - when accessed via /prison/:prisonId/isu/pco
+  const isIsuRoute = unitId?.endsWith('-isu') || (prisonId && !unitId)
+  const id = isIsuRoute 
+    ? (unitId as UnitId) || `${prisonId}-isu` as UnitId
+    : (unitId ?? 'north') as UnitId
   const unitsToSearch = prisonId ? getUnitsForPrison(prisonId) : UNITS
   const unit = unitsToSearch.find((u) => u.id === id) ?? UNITS[0]
 
@@ -35,6 +39,7 @@ export default function UnitPcoHub() {
   const [availableSnapshots, setAvailableSnapshots] = useState<string[]>([])
   const [loadedSnapshot, setLoadedSnapshot] = useState<any | null>(null)
   const [pendingInductions, setPendingInductions] = useState<{ prisoner: Prisoner; id: string }[]>([])
+  const [pendingMoves, setPendingMoves] = useState<any[]>([])
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -46,6 +51,7 @@ export default function UnitPcoHub() {
     setIncompleteCount(count)
     setAvailableSnapshots(listHubSnapshots(id))
     setPendingInductions(getPrisonersPendingInductionNotification(id))
+    setPendingMoves(getPrisonersPendingMoveNotification(id))
 
     const onStorage = () => {
       setPrisoners(getPrisoners(id))
@@ -54,6 +60,7 @@ export default function UnitPcoHub() {
       const updated = countIncompleteDailyTasks(id, today)
       setIncompleteCount(updated)
       setPendingInductions(getPrisonersPendingInductionNotification(id))
+      setPendingMoves(getPrisonersPendingMoveNotification(id))
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -62,6 +69,13 @@ export default function UnitPcoHub() {
   const handleDismissInduction = (prisonerId: string) => {
     markPrisonerInductionNotified(prisonerId, id)
     setPendingInductions(getPrisonersPendingInductionNotification(id))
+    setPrisoners(getPrisoners(id))
+    setAudit(getAuditEntries())
+  }
+
+  const handleDismissMove = (prisonerId: string) => {
+    markPrisonerMoveNotified(prisonerId, id)
+    setPendingMoves(getPrisonersPendingMoveNotification(id))
     setPrisoners(getPrisoners(id))
     setAudit(getAuditEntries())
   }
@@ -121,8 +135,13 @@ export default function UnitPcoHub() {
 <GlassLayout>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <Link to={prisonId ? `/prison/${prisonId}/unit/${id}` : `/unit/${id}`} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
-          <h1 className="text-2xl font-bold text-corrections-charcoal">{unit.name} — PCO Hub</h1>
+          <Link to={isIsuRoute ? (prisonId ? `/prison/${prisonId}/isu` : `/isu`) : (prisonId ? `/prison/${prisonId}/unit/${id}` : `/unit/${id}`)} className="text-corrections-blue hover:underline text-sm mb-1 inline-block">← {unit.name} Hub</Link>
+          <h1 className="text-2xl font-bold text-corrections-charcoal">{unit.name} — Principal Corrections Officer Hub</h1>
+          <div className="flex gap-2 mt-2">
+            <Link to={prisonId ? `/prison/${prisonId}/unit/${id}/pco/requests` : `/unit/${id}/pco/requests`} className="btn-outline text-sm">
+              PCO Approval Queue
+            </Link>
+          </div>
           <p className="text-sm text-slate-600">Unit-specific operational overview, muster summary, and audit review</p>
         </div>
       </div>
@@ -167,7 +186,9 @@ export default function UnitPcoHub() {
             {pendingInductions.length > 0 && (
               <div className="border-l-4 border-blue-500 bg-blue-50 p-3 rounded">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-blue-600">📋</span>
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
                   <h3 className="font-semibold text-blue-800 text-sm">Prisoner Inductions Complete ({pendingInductions.length})</h3>
                 </div>
                 <ul className="space-y-2">
@@ -189,7 +210,7 @@ export default function UnitPcoHub() {
                 </ul>
               </div>
             )}
-            
+
             {/* Analytics Alerts */}
             <div className="space-y-3">
               <h4 className="font-semibold text-sm">Analytics & Alerts</h4>
@@ -198,7 +219,9 @@ export default function UnitPcoHub() {
               {lowYardPrisoners.length > 0 && (
                 <div className="border-l-4 border-amber-500 bg-amber-50 p-3 rounded">
                   <div className="flex items-center gap-2">
-                    <span className="text-amber-600">⚠️</span>
+                    <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
                     <h3 className="font-semibold text-amber-800 text-sm">Low Yard Hours ({lowYardPrisoners.length})</h3>
                   </div>
                   <p className="text-xs text-amber-700 mt-1">Prisoners with less than 2 hours yard time:</p>
@@ -220,7 +243,9 @@ export default function UnitPcoHub() {
               {missedMealsPrisoners.length > 0 && (
                 <div className="border-l-4 border-red-500 bg-red-50 p-3 rounded">
                   <div className="flex items-center gap-2">
-                    <span className="text-red-600">🍽️</span>
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     <h3 className="font-semibold text-red-800 text-sm">Missed All Meals ({missedMealsPrisoners.length})</h3>
                   </div>
                   <p className="text-xs text-red-700 mt-1">Prisoners who missed all meals:</p>
@@ -242,7 +267,9 @@ export default function UnitPcoHub() {
               {opsPrisoners.length > 0 && (
                 <div className="border-l-4 border-red-600 bg-red-100 p-3 rounded">
                   <div className="flex items-center gap-2">
-                    <span className="text-red-700">🚨</span>
+                    <svg className="w-5 h-5 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
                     <h3 className="font-semibold text-red-900 text-sm">OPs Active ({opsPrisoners.length})</h3>
                   </div>
                   <ul className="mt-2 space-y-1">
@@ -263,7 +290,9 @@ export default function UnitPcoHub() {
               {ccsPrisoners.length > 0 && (
                 <div className="border-l-4 border-red-600 bg-red-100 p-3 rounded">
                   <div className="flex items-center gap-2">
-                    <span className="text-red-700">🚨</span>
+                    <svg className="w-5 h-5 text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
                     <h3 className="font-semibold text-red-900 text-sm">CCs Active ({ccsPrisoners.length})</h3>
                   </div>
                   <ul className="mt-2 space-y-1">
@@ -284,7 +313,9 @@ export default function UnitPcoHub() {
               {lowYardPrisoners.length === 0 && missedMealsPrisoners.length === 0 && opsPrisoners.length === 0 && ccsPrisoners.length === 0 && (
                 <div className="bg-green-50 border-l-4 border-green-500 p-3 rounded">
                   <div className="flex items-center gap-2">
-                    <span className="text-green-600">✓</span>
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
                     <span className="text-sm text-green-800 font-medium">No operational alerts</span>
                   </div>
                 </div>

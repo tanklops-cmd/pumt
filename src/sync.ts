@@ -5,19 +5,45 @@ import { connectWebSocket, subscribeToUpdates, disconnectWebSocket } from './wsC
 // Sync interval in milliseconds (5 seconds)
 const SYNC_INTERVAL = 5000;
 
-// Storage keys for local fallback
-const STORAGE_KEYS = {
-  prisoners: 'prison-muster-prisoners',
-  dailyTasks: 'prison-muster-daily-tasks',
-  musterConfirm: 'prison-muster-confirm',
-  cellAlarms: 'prison-muster-cell-alarms',
-  handover: 'prison-muster-handover',
-  searchTargets: 'prison-muster-search-targets',
-  stripSearch: 'prison-muster-strip-search',
-  unitMaintenance: 'prison-muster-unit-maintenance',
-  prisonerInductions: 'prison-muster-prisoner-inductions',
-  lastSync: 'prison-muster-last-sync',
+// In-memory data store (replaces localStorage)
+const inMemoryData: {
+  prisoners: any[];
+  dailyTasks: any[];
+  musterConfirmations: any[];
+  cellAlarms: any[];
+  handovers: Record<string, Record<string, any>>;
+  searchTargets: any[];
+  stripSearches: Record<string, Record<string, any>>;
+  unitMaintenance: any[];
+  prisonerInductions: any[];
+  notifications: any[];
+  sacraReminders: any[];
+  controlHandover: Record<string, any>;
+  lastSync: string | null;
+} = {
+  prisoners: [],
+  dailyTasks: [],
+  musterConfirmations: [],
+  cellAlarms: [],
+  handovers: {},
+  searchTargets: [],
+  stripSearches: {},
+  unitMaintenance: [],
+  prisonerInductions: [],
+  notifications: [],
+  sacraReminders: [],
+  controlHandover: {},
+  lastSync: null,
 };
+
+// Export getter functions for store.ts to use
+export function getInMemoryData() {
+  return inMemoryData;
+}
+
+export function setInMemoryData(key: keyof typeof inMemoryData, value: any) {
+  (inMemoryData as any)[key] = value;
+}
 
 export interface SyncState {
   isOnline: boolean;
@@ -29,38 +55,17 @@ export interface SyncState {
 const initialSyncState: SyncState = {
   isOnline: navigator.onLine,
   isSyncing: false,
-  lastSyncTime: localStorage.getItem(STORAGE_KEYS.lastSync),
+  lastSyncTime: null,
   error: null,
 };
 
 /**
  * Custom hook for syncing data with the backend
- * Falls back to localStorage when offline
  */
 export function useSync() {
   const [syncState, setSyncState] = useState<SyncState>(initialSyncState);
   const syncIntervalRef = useRef<number | null>(null);
   const isSyncingRef = useRef(false);
-
-  // Save to localStorage as fallback
-  const saveToLocalStorage = useCallback((key: string, data: any) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-    } catch (e) {
-      console.error('Failed to save to localStorage:', e);
-    }
-  }, []);
-
-  // Load from localStorage
-  const loadFromLocalStorage = useCallback((key: string): any => {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      console.error('Failed to load from localStorage:', e);
-      return null;
-    }
-  }, []);
 
   // Connect to WebSocket for real-time updates
   useEffect(() => {
@@ -68,32 +73,37 @@ export function useSync() {
     
     // Subscribe to WebSocket updates
     const unsubscribe = subscribeToUpdates((data) => {
-      // Save to localStorage
-      saveToLocalStorage(STORAGE_KEYS.prisoners, data.prisoners);
-      saveToLocalStorage(STORAGE_KEYS.dailyTasks, data.dailyTasks);
-      saveToLocalStorage(STORAGE_KEYS.musterConfirm, data.musterConfirmations);
-      saveToLocalStorage(STORAGE_KEYS.cellAlarms, data.cellAlarms);
+      // Update in-memory store with deduplication
+      // Use Map to keep first occurrence (by ID) to avoid duplicates
+      const taskMap = new Map();
+      for (const t of data.dailyTasks || []) {
+        taskMap.set(t.id, t);
+      }
+      inMemoryData.dailyTasks = Array.from(taskMap.values());
+      inMemoryData.prisoners = data.prisoners || [];
+      inMemoryData.musterConfirmations = data.musterConfirmations || [];
+      inMemoryData.cellAlarms = data.cellAlarms || [];
       
       const handoverObj: Record<string, Record<string, any>> = {};
       for (const h of data.handovers || []) {
         if (!handoverObj[h.unitId]) handoverObj[h.unitId] = {};
         handoverObj[h.unitId][h.date] = h;
       }
-      saveToLocalStorage(STORAGE_KEYS.handover, handoverObj);
+      inMemoryData.handovers = handoverObj;
       
-      saveToLocalStorage(STORAGE_KEYS.searchTargets, data.searchTargets);
+      inMemoryData.searchTargets = data.searchTargets || [];
       
       const stripSearchObj: Record<string, Record<string, any>> = {};
       for (const s of data.stripSearches || []) {
         if (!stripSearchObj[s.unitId]) stripSearchObj[s.unitId] = {};
         stripSearchObj[s.unitId][s.date] = s;
       }
-      saveToLocalStorage(STORAGE_KEYS.stripSearch, stripSearchObj);
+      inMemoryData.stripSearches = stripSearchObj;
       
-      saveToLocalStorage(STORAGE_KEYS.unitMaintenance, data.unitMaintenance);
-      saveToLocalStorage(STORAGE_KEYS.prisonerInductions, data.prisonerInductions);
+      inMemoryData.unitMaintenance = data.unitMaintenance || [];
+      inMemoryData.prisonerInductions = data.prisonerInductions || [];
       
-      localStorage.setItem(STORAGE_KEYS.lastSync, data.timestamp);
+      inMemoryData.lastSync = data.timestamp;
       
       // Dispatch event for components to refresh
       window.dispatchEvent(new CustomEvent('data-synced', { detail: data }));
@@ -103,7 +113,7 @@ export function useSync() {
       unsubscribe();
       disconnectWebSocket();
     };
-  }, [saveToLocalStorage]);
+  }, []);
 
   // Perform sync with backend
   const performSync = useCallback(async (showSyncing = true) => {
@@ -118,18 +128,17 @@ export function useSync() {
       // Try to fetch from backend
       const data = await api.fetchAllData();
       
-      // Always save and sync - don't check timestamps (multi-device scenario)
-      // Save prisoners as-is (array)
-      saveToLocalStorage(STORAGE_KEYS.prisoners, data.prisoners);
+      // Update in-memory store with deduplication
+      // Use Map to keep first occurrence (by ID) to avoid duplicates
+      const taskMap = new Map();
+      for (const t of data.dailyTasks || []) {
+        taskMap.set(t.id, t);
+      }
+      inMemoryData.dailyTasks = Array.from(taskMap.values());
       
-      // Save dailyTasks as-is (array)
-      saveToLocalStorage(STORAGE_KEYS.dailyTasks, data.dailyTasks);
-      
-      // Save musterConfirm as-is (array)
-      saveToLocalStorage(STORAGE_KEYS.musterConfirm, data.musterConfirmations);
-      
-      // Save cellAlarms as-is (array)
-      saveToLocalStorage(STORAGE_KEYS.cellAlarms, data.cellAlarms);
+      inMemoryData.prisoners = data.prisoners || [];
+      inMemoryData.musterConfirmations = data.musterConfirmations || [];
+      inMemoryData.cellAlarms = data.cellAlarms || [];
       
       // Convert handovers array to nested object format { unitId: { date: handover } }
       const handoverObj: Record<string, Record<string, any>> = {};
@@ -137,10 +146,9 @@ export function useSync() {
         if (!handoverObj[h.unitId]) handoverObj[h.unitId] = {};
         handoverObj[h.unitId][h.date] = h;
       }
-      saveToLocalStorage(STORAGE_KEYS.handover, handoverObj);
+      inMemoryData.handovers = handoverObj;
       
-      // Save searchTargets as-is (array)
-      saveToLocalStorage(STORAGE_KEYS.searchTargets, data.searchTargets);
+      inMemoryData.searchTargets = data.searchTargets || [];
       
       // Convert stripSearches array to nested object format { unitId: { date: record } }
       const stripSearchObj: Record<string, Record<string, any>> = {};
@@ -148,16 +156,13 @@ export function useSync() {
         if (!stripSearchObj[s.unitId]) stripSearchObj[s.unitId] = {};
         stripSearchObj[s.unitId][s.date] = s;
       }
-      saveToLocalStorage(STORAGE_KEYS.stripSearch, stripSearchObj);
+      inMemoryData.stripSearches = stripSearchObj;
       
-      // Save unitMaintenance as-is (array)
-      saveToLocalStorage(STORAGE_KEYS.unitMaintenance, data.unitMaintenance);
-      
-      // Save prisonerInductions as-is (array)
-      saveToLocalStorage(STORAGE_KEYS.prisonerInductions, data.prisonerInductions);
+      inMemoryData.unitMaintenance = data.unitMaintenance || [];
+      inMemoryData.prisonerInductions = data.prisonerInductions || [];
       
       const now = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEYS.lastSync, now);
+      inMemoryData.lastSync = now;
 
       setSyncState(prev => ({
         ...prev,
@@ -169,18 +174,17 @@ export function useSync() {
       // Dispatch event for components to refresh
       window.dispatchEvent(new CustomEvent('data-synced', { detail: data }));
     } catch (error) {
-      console.error('Sync failed, using localStorage:', error);
+      console.error('Sync failed:', error);
       
-      // Fall back to localStorage
       setSyncState(prev => ({
         ...prev,
         isSyncing: false,
-        error: 'Offline mode - using local data',
+        error: 'Failed to sync with server',
       }));
     } finally {
       isSyncingRef.current = false;
     }
-  }, [saveToLocalStorage]);
+  }, []);
 
   // Start periodic sync
   const startAutoSync = useCallback(() => {
@@ -210,27 +214,17 @@ export function useSync() {
     return performSync(true);
   }, [performSync]);
 
-  // Get data from localStorage (for offline use)
-  const getLocalData = useCallback(() => {
-    return {
-      prisoners: loadFromLocalStorage(STORAGE_KEYS.prisoners) || [],
-      dailyTasks: loadFromLocalStorage(STORAGE_KEYS.dailyTasks) || [],
-      musterConfirmations: loadFromLocalStorage(STORAGE_KEYS.musterConfirm) || [],
-      cellAlarms: loadFromLocalStorage(STORAGE_KEYS.cellAlarms) || [],
-      handovers: loadFromLocalStorage(STORAGE_KEYS.handover) || [],
-      searchTargets: loadFromLocalStorage(STORAGE_KEYS.searchTargets) || [],
-      stripSearches: loadFromLocalStorage(STORAGE_KEYS.stripSearch) || [],
-      unitMaintenance: loadFromLocalStorage(STORAGE_KEYS.unitMaintenance) || [],
-      prisonerInductions: loadFromLocalStorage(STORAGE_KEYS.prisonerInductions) || [],
-    };
-  }, [loadFromLocalStorage]);
+  // Get data from in-memory store
+  const getInMemoryStore = useCallback(() => {
+    return inMemoryData;
+  }, []);
 
   return {
     ...syncState,
     startAutoSync,
     stopAutoSync,
     refresh,
-    getLocalData,
+    getInMemoryStore,
   };
 }
 
@@ -263,15 +257,7 @@ export const syncUtils = {
         await api.savePrisoner(prisoner);
       }
     } catch (error) {
-      // Save to localStorage as fallback
-      const prisoners = JSON.parse(localStorage.getItem(STORAGE_KEYS.prisoners) || '[]');
-      const idx = prisoners.findIndex((p: any) => p.id === prisoner.id);
-      if (idx >= 0) {
-        prisoners[idx] = prisoner;
-      } else {
-        prisoners.push(prisoner);
-      }
-      localStorage.setItem(STORAGE_KEYS.prisoners, JSON.stringify(prisoners));
+      console.error('Failed to push prisoner update:', error);
     }
   },
 
@@ -279,15 +265,7 @@ export const syncUtils = {
     try {
       await api.updateTask(task.id, task);
     } catch (error) {
-      // Save to localStorage as fallback
-      const tasks = JSON.parse(localStorage.getItem(STORAGE_KEYS.dailyTasks) || '[]');
-      const idx = tasks.findIndex((t: any) => t.id === task.id);
-      if (idx >= 0) {
-        tasks[idx] = task;
-      } else {
-        tasks.push(task);
-      }
-      localStorage.setItem(STORAGE_KEYS.dailyTasks, JSON.stringify(tasks));
+      console.error('Failed to push task update:', error);
     }
   },
 
@@ -295,15 +273,7 @@ export const syncUtils = {
     try {
       await api.saveMuster(muster);
     } catch (error) {
-      // Save to localStorage as fallback
-      const musters = JSON.parse(localStorage.getItem(STORAGE_KEYS.musterConfirm) || '[]');
-      const idx = musters.findIndex((m: any) => m.unitId === muster.unitId && m.date === muster.date);
-      if (idx >= 0) {
-        musters[idx] = muster;
-      } else {
-        musters.push(muster);
-      }
-      localStorage.setItem(STORAGE_KEYS.musterConfirm, JSON.stringify(musters));
+      console.error('Failed to push muster update:', error);
     }
   },
 
@@ -311,15 +281,7 @@ export const syncUtils = {
     try {
       await api.updateAlarm(alarm.id, alarm);
     } catch (error) {
-      // Save to localStorage as fallback
-      const alarms = JSON.parse(localStorage.getItem(STORAGE_KEYS.cellAlarms) || '[]');
-      const idx = alarms.findIndex((a: any) => a.id === alarm.id);
-      if (idx >= 0) {
-        alarms[idx] = alarm;
-      } else {
-        alarms.push(alarm);
-      }
-      localStorage.setItem(STORAGE_KEYS.cellAlarms, JSON.stringify(alarms));
+      console.error('Failed to push alarm update:', error);
     }
   },
 
@@ -327,11 +289,7 @@ export const syncUtils = {
     try {
       await api.saveHandover(handover);
     } catch (error) {
-      // Save to localStorage as fallback
-      const handovers = JSON.parse(localStorage.getItem(STORAGE_KEYS.handover) || '{}');
-      if (!handovers[handover.unitId]) handovers[handover.unitId] = {};
-      handovers[handover.unitId][handover.date] = handover;
-      localStorage.setItem(STORAGE_KEYS.handover, JSON.stringify(handovers));
+      console.error('Failed to push handover update:', error);
     }
   },
 };

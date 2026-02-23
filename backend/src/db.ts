@@ -11,6 +11,12 @@ import { PrisonerInduction } from './entity/PrisonerInduction';
 import { StripSearch } from './entity/StripSearch';
 import { UnitConfig } from './entity/UnitConfig';
 import { PrisonBriefing } from './entity/PrisonBriefing';
+import { Notification } from './entity/Notification';
+import { SacraReminder } from './entity/SacraReminder';
+import { ControlHandover } from './entity/ControlHandover';
+import { IsuObservation } from './entity/IsuObservation';
+import { BriefingPDF } from './entity/BriefingPDF';
+import { PrisonerRequest, PrisonerRequestAction } from './entity/PrisonerRequest';
 
 export const dataSource = new DataSource({
   type: 'sqljs',
@@ -30,6 +36,13 @@ export const dataSource = new DataSource({
     StripSearch,
     UnitConfig,
     PrisonBriefing,
+    Notification,
+    SacraReminder,
+    ControlHandover,
+    IsuObservation,
+    BriefingPDF,
+    PrisonerRequest,
+    PrisonerRequestAction,
   ],
 });
 

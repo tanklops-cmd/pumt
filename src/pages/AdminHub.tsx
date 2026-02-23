@@ -7,6 +7,7 @@ import { ADMIN_PASSWORD } from '../constants'
 import { generateMockPrisoners } from '../mockPrisoners'
 import { UNITS } from '../constants'
 import * as api from '../api'
+import { useSync } from '../sync'
 
 const STORAGE_ADMIN_KEY = 'prison-muster-admin-ok'
 
@@ -26,6 +27,25 @@ export default function AdminHub() {
   const [selectedUnit, setSelectedUnit] = useState(UNITS[0].id)
   const [availableSnapshots, setAvailableSnapshots] = useState<string[]>([])
   const [loadedSnapshot, setLoadedSnapshot] = useState<any | null>(null)
+  
+  // Scheduler config state
+  const [scheduleEnabled, setScheduleEnabled] = useState(false)
+  const [scheduleTime, setScheduleTime] = useState('00:00')
+  const [scheduleLoading, setScheduleLoading] = useState(false)
+  const [scheduleSaved, setScheduleSaved] = useState(false)
+  
+  // Use sync hook to trigger refresh after loading mock data
+  const { refresh } = useSync()
+
+  // Load schedule config on mount
+  useEffect(() => {
+    if (authenticated) {
+      api.getScheduleConfig().then((config) => {
+        setScheduleEnabled(config.enabled)
+        setScheduleTime(config.time)
+      }).catch(console.error)
+    }
+  }, [authenticated])
 
   useEffect(() => {
     if (authenticated) setAudit(getAuditEntries())
@@ -89,21 +109,40 @@ export default function AdminHub() {
   const loadMockPrisoners = async () => {
     if (!confirm('This will replace all current prisoners with 190 mock prisoners across all units. Continue?')) return
     
-    const mock = generateMockPrisoners()
-    replaceAllPrisoners(mock)
-    
-    // Push each prisoner to backend
-    for (const prisoner of mock) {
-      try {
-        await api.savePrisoner(prisoner)
-      } catch (e) {
-        console.error('Failed to save prisoner:', prisoner.id, e)
+    try {
+      // First, fetch and delete all existing prisoners from backend
+      const existingPrisoners = await api.fetchPrisoners()
+      for (const prisoner of existingPrisoners) {
+        try {
+          await api.deletePrisoner(prisoner.id)
+        } catch (e) {
+          console.error('Failed to delete prisoner:', prisoner.id, e)
+        }
       }
+      
+      // Generate and save new mock prisoners
+      const mock = generateMockPrisoners()
+      replaceAllPrisoners(mock)
+      
+      // Push each prisoner to backend
+      for (const prisoner of mock) {
+        try {
+          await api.savePrisoner(prisoner)
+        } catch (e) {
+          console.error('Failed to save prisoner:', prisoner.id, e)
+        }
+      }
+      
+      // Refresh data from backend to update UI
+      await refresh()
+      
+      addAuditEntry({ action: 'Mock data loaded', detail: '190 prisoners' })
+      setAudit(getAuditEntries())
+      alert('Loaded 190 mock prisoners (South: 60, Centre: 60, North: 35, Remand: 35).\n\nData saved to backend and UI refreshed.')
+    } catch (e) {
+      console.error('Failed to load mock prisoners:', e)
+      alert('Failed to load mock prisoners. Check console for details.')
     }
-    
-    addAuditEntry({ action: 'Mock data loaded', detail: '190 prisoners' })
-    setAudit(getAuditEntries())
-    alert('Loaded 190 mock prisoners (South: 60, Centre: 60, North: 35, Remand: 35).')
   }
 
   const refreshSnapshots = (unitId = selectedUnit) => {
@@ -115,8 +154,73 @@ export default function AdminHub() {
     setLoadedSnapshot(snap)
   }
 
+  // Save schedule configuration
+  const handleSaveSchedule = async () => {
+    setScheduleLoading(true)
+    try {
+      await api.setScheduleConfig({
+        enabled: scheduleEnabled,
+        time: scheduleTime,
+      })
+      setScheduleSaved(true)
+      setTimeout(() => setScheduleSaved(false), 3000)
+    } catch (err) {
+      console.error('Failed to save schedule:', err)
+      alert('Failed to save schedule configuration')
+    } finally {
+      setScheduleLoading(false)
+    }
+  }
+
   return (
     <GlassLayout>
+      {/* Scheduler Configuration Section */}
+      <div className="card mb-6">
+        <div className="px-4 py-3 bg-corrections-blue text-white font-semibold">
+          Automatic Scheduled Record
+        </div>
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-slate-600">
+            Configure an automatic daily trigger to record all unit hubs. This will run at the specified time each day and create audit entries for all units.
+          </p>
+          <div className="flex items-center gap-4 flex-wrap">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={scheduleEnabled}
+                onChange={(e) => setScheduleEnabled(e.target.checked)}
+                className="w-5 h-5"
+              />
+              <span className="font-medium">Enable automatic recording</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <label className="font-medium">Time:</label>
+              <input
+                type="time"
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+                className="border rounded px-3 py-2"
+                disabled={!scheduleEnabled}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleSaveSchedule}
+              disabled={scheduleLoading}
+              className="btn-corrections"
+            >
+              {scheduleLoading ? 'Saving...' : 'Save Schedule'}
+            </button>
+            {scheduleSaved && (
+              <span className="text-green-600 text-sm">✓ Saved</span>
+            )}
+          </div>
+          <p className="text-xs text-slate-500">
+            Common times: 00:00 (midnight), 06:00 (shift change morning), 14:00 (shift change afternoon), 22:00 (night shift)
+          </p>
+        </div>
+      </div>
+
       <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
         <h1 className="text-2xl font-bold text-corrections-charcoal">Audit trail</h1>
         <div className="flex gap-2 flex-wrap">

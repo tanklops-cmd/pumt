@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import GlassLayout from '../components/GlassLayout'
-import { getAllUnitsSummary, getUnitsSummaryForPrison, getControlHandover, setControlHandover, resetDailyTasksForDate, resetDailyTasksForPrison, getPrisoners, getAllPrisoners, unitsWithIncompleteTasksForPrison, unitsWithIncompleteTasksForAll } from '../store'
+import { getAllUnitsSummary, getUnitsSummaryForPrison, getControlHandover, setControlHandover, resetDailyTasksForDate, resetDailyTasksForPrison, getPrisoners, getAllPrisoners, unitsWithIncompleteTasksForPrison, unitsWithIncompleteTasksForAll, addAuditEntry } from '../store'
 import { PRISONS } from '../constants'
+import { recordAllUnits, recordPrisonUnits } from '../api'
+import { subscribePageRecord } from '../ws'
 import type { Prisoner } from '../types'
 
 function today(): string {
@@ -18,6 +20,8 @@ export default function ControlHub() {
   const [prisonersByUnit, setPrisonersByUnit] = useState<Record<string, Prisoner[]>>({})
   const [quickLookupQuery, setQuickLookupQuery] = useState('')
   const [quickLookupResults, setQuickLookupResults] = useState<Prisoner[]>([])
+  const [recording, setRecording] = useState(false)
+  const [recordResult, setRecordResult] = useState<{ triggeredBy: string; timestamp: string; successful: number; totalUnits: number } | null>(null)
 
   const LOCATION_LABELS: Record<string, string> = {
     CELL: 'Cell',
@@ -87,6 +91,71 @@ export default function ControlHub() {
     })
   }
 
+  // Handle Record All Units
+  const handleRecordAllUnits = async () => {
+    if (!prisonId) {
+      // Global - record all units
+      try {
+        setRecording(true)
+        const result = await recordAllUnits('manual')
+        setRecordResult({
+          triggeredBy: result.triggeredBy || 'manual',
+          timestamp: result.timestamp,
+          successful: result.successful,
+          totalUnits: result.totalUnits,
+        })
+        // Refresh data after recording
+        setSummary(getAllUnitsSummary())
+      } catch (err) {
+        console.error('Failed to record all units:', err)
+        alert('Failed to record all units')
+      } finally {
+        setRecording(false)
+      }
+    } else {
+      // Prison-specific - record all units for this prison
+      try {
+        setRecording(true)
+        const result = await recordPrisonUnits(prisonId, 'manual')
+        setRecordResult({
+          triggeredBy: result.triggeredBy || 'manual',
+          timestamp: result.timestamp,
+          successful: result.successful,
+          totalUnits: result.totalUnits,
+        })
+        // Refresh data after recording
+        setSummary(getUnitsSummaryForPrison(prisonId))
+      } catch (err) {
+        console.error('Failed to record prison units:', err)
+        alert('Failed to record prison units')
+      } finally {
+        setRecording(false)
+      }
+    }
+  }
+
+  // Subscribe to page record events for real-time updates
+  useEffect(() => {
+    const sub = subscribePageRecord((event) => {
+      if (event.action === 'all_completed' || (event.action === 'prison_completed' && event.payload.prisonId === prisonId)) {
+        setRecordResult({
+          triggeredBy: event.payload.triggeredBy,
+          timestamp: event.payload.timestamp,
+          successful: event.payload.successful || 0,
+          totalUnits: event.payload.totalUnits || 0,
+        })
+        // Refresh data
+        if (prisonId) {
+          setSummary(getUnitsSummaryForPrison(prisonId))
+        } else {
+          setSummary(getAllUnitsSummary())
+        }
+        setRecording(false)
+      }
+    })
+    return () => sub.close()
+  }, [prisonId])
+
   return (
 <GlassLayout>
       <div className="mb-6 flex items-center justify-between">
@@ -144,8 +213,33 @@ export default function ControlHub() {
             </ul>
                     <div className="mt-4">
                       <button type="button" onClick={() => setSummary(prisonId ? getUnitsSummaryForPrison(prisonId) : getAllUnitsSummary())} className="btn-outline mr-2">Refresh</button>
-                      <button type="button" onClick={handleResetTasks} className="btn-corrections">Reset for New Day</button>
+                      <button type="button" onClick={handleResetTasks} className="btn-corrections mr-2">Reset for New Day</button>
+                      <button 
+                        type="button" 
+                        onClick={handleRecordAllUnits} 
+                        disabled={recording}
+                        className="btn-corrections bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                      >
+                        {recording ? 'Recording...' : 'Record All Units'}
+                      </button>
                     </div>
+                    
+                    {/* Record Result Notification */}
+                    {recordResult && (
+                      <div className="mt-4 bg-green-50 border border-green-200 rounded p-3">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span className="text-sm font-medium text-green-800">
+                            Recorded {recordResult.successful}/{recordResult.totalUnits} units
+                          </span>
+                        </div>
+                        <div className="text-xs text-green-600 mt-1">
+                          Triggered by: {recordResult.triggeredBy} at {new Date(recordResult.timestamp).toLocaleTimeString()}
+                        </div>
+                      </div>
+                    )}
                     <div className="mt-4">
                       <div className="text-xs text-slate-500 mb-2">Units with incomplete daily tasks</div>
                       {incompleteUnits.length === 0 ? (

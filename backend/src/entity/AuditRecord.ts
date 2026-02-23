@@ -14,6 +14,18 @@ export class AuditRecord {
   @Column({ name: 'page_name', nullable: true })
   pageName!: string;
 
+  @Column({ nullable: true })
+  action!: string;
+
+  @Column({ nullable: true })
+  detail!: string;
+
+  @Column({ name: 'prisoner_name', nullable: true })
+  prisonerName!: string;
+
+  @Column({ name: 'prisoner_location', nullable: true })
+  prisonerLocation!: string;
+
   @CreateDateColumn({ name: 'timestamp' })
   timestamp!: Date;
 

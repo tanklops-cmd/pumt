@@ -49,6 +49,8 @@ export interface Prisoner {
   inductedBy?: string
   inductedAt?: string
   pcoNotified?: boolean
+  // Move notification flag - set to false when prisoner arrives at new unit
+  moveToUnitNotified?: boolean
 }
 
 export interface HandoverSection {

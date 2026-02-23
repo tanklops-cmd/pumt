@@ -77,6 +77,9 @@ export class Prisoner {
   @Column({ default: false })
   pcoNotified!: boolean;
 
+  @Column({ default: true })
+  moveToUnitNotified!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 

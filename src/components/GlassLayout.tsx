@@ -33,6 +33,18 @@ const HelpIcon = () => (
   </svg>
 )
 
+const FormsIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+)
+
+const BriefingIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+  </svg>
+)
+
 const MenuIcon = () => (
   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -57,16 +69,15 @@ export default function GlassLayout({ children }: GlassLayoutProps) {
 
   const menuItems = [
     { icon: <HomeIcon />, label: 'Home', path: '/' },
+    { icon: <BriefingIcon />, label: 'Briefings', path: '/briefings' },
     { icon: <AdminIcon />, label: 'Admin', path: '/admin' },
     { icon: <AuditIcon />, label: 'Audit Log', path: '/audit' },
-    { icon: <ConfigIcon />, label: 'Unit Config', path: '/unit-config' },
-    { icon: <HelpIcon />, label: 'How to Use', action: 'help' },
+    { icon: <FormsIcon />, label: 'Forms', path: '/forms' },
+    { icon: <HelpIcon />, label: 'How to Use', path: '/how-to-use' },
   ]
 
   const handleNav = (item: typeof menuItems[0]) => {
-    if (item.action === 'help') {
-      alert('Help section coming soon!')
-    } else if (item.path) {
+    if (item.path) {
       navigate(item.path)
     }
     setSidebarOpen(false)
@@ -74,64 +85,83 @@ export default function GlassLayout({ children }: GlassLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      {/* Mobile menu button - visible on small screens */}
+      {/* Mobile menu button - visible on small and medium screens */}
       <button
         onClick={() => setSidebarOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-lg bg-white/80 backdrop-blur border border-slate-200 flex items-center justify-center text-corrections-charcoal shadow-lg"
+        className="md:hidden fixed top-4 left-4 z-50 w-12 h-12 rounded-lg bg-white/90 backdrop-blur border border-slate-200 flex items-center justify-center text-corrections-charcoal shadow-lg touch-manipulation"
+        aria-label="Open menu"
+      >
+        <MenuIcon />
+      </button>
+
+      {/* Tablet menu button - visible on medium screens only */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="hidden md:flex lg:hidden fixed top-4 left-4 z-50 w-12 h-12 rounded-lg bg-white/90 backdrop-blur border border-slate-200 items-center justify-center text-corrections-charcoal shadow-lg"
+        aria-label="Open menu"
       >
         <MenuIcon />
       </button>
 
       {/* Mobile overlay */}
-      {sidebarOpen && (
+      {(sidebarOpen) && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          className="md:hidden fixed inset-0 bg-black/50 z-40"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar - fixed on desktop, slide-in on mobile */}
+      {/* Tablet overlay */}
+      {(sidebarOpen) && (
+        <div 
+          className="hidden md:block lg:hidden fixed inset-0 bg-black/30 z-40"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - fixed on desktop, slide-in on tablet/mobile */}
       <aside className={`
         fixed left-0 top-0 h-full w-64 bg-white/80 backdrop-blur-xl border-r border-slate-200 z-50 shadow-lg
         transform transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0
+        md:translate-x-0
       `}>
         <div className="flex flex-col h-full">
           {/* Logo and close button */}
-          <div className="p-6 border-b border-slate-200 flex items-center justify-between">
+          <div className="p-4 md:p-6 border-b border-slate-200 flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-corrections-charcoal">PUMT</h2>
-              <p className="text-sm text-corrections-stone">Prison Unit Management Tool</p>
+              <h2 className="text-lg md:text-xl font-bold text-corrections-charcoal">PUMT</h2>
+              <p className="text-xs md:text-sm text-corrections-stone hidden sm:block">Prison Unit Management Tool</p>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-700"
+              className="md:hidden w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-700"
+              aria-label="Close menu"
             >
               <CloseIcon />
             </button>
           </div>
 
-          {/* Menu items */}
-          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          {/* Menu items - larger touch targets on mobile */}
+          <nav className="flex-1 p-2 md:p-4 space-y-1 overflow-y-auto">
             {menuItems.map((item) => (
               <button
                 key={item.label}
                 onClick={() => handleNav(item)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`w-full flex items-center gap-3 px-3 md:px-4 py-3 md:py-3 rounded-lg transition-colors ${
                   location.pathname === item.path 
                     ? 'bg-corrections-blue-pale text-corrections-blue' 
                     : 'text-corrections-charcoal/80 hover:bg-corrections-blue-pale hover:text-corrections-blue'
                 }`}
               >
-                <span className="text-corrections-blue">{item.icon}</span>
-                <span className="font-medium">{item.label}</span>
+                <span className="text-corrections-blue flex-shrink-0">{item.icon}</span>
+                <span className="font-medium text-sm md:text-base">{item.label}</span>
               </button>
             ))}
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-slate-200">
+          <div className="p-3 md:p-4 border-t border-slate-200">
             <p className="text-xs text-corrections-stone text-center">
               Ara Poutama Aotearoa
             </p>
@@ -139,9 +169,9 @@ export default function GlassLayout({ children }: GlassLayoutProps) {
         </div>
       </aside>
 
-      {/* Main content - margin adjusted for sidebar on desktop */}
-      <div className="lg:ml-64">
-        <div className="p-4 md:p-6 lg:p-8">
+      {/* Main content - margin adjusted for sidebar on tablet and desktop */}
+      <div className="md:ml-64 lg:ml-64">
+        <div className="p-3 sm:p-4 md:p-5 lg:p-6 xl:p-8">
           {children}
         </div>
       </div>

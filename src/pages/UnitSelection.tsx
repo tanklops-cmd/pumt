@@ -71,7 +71,7 @@ export default function UnitSelection() {
             </div>
 
             {/* Briefing Section - Inline */}
-            <div className="flex-1 border-l border-slate-200 lg:pl-6">
+            <div className="flex-[2] border-l border-slate-200 lg:pl-6 min-w-0">
               {prisonId && <BriefingPanel prisonId={prisonId} />}
             </div>
           </div>
@@ -87,7 +87,7 @@ export default function UnitSelection() {
         {units.map((unit) => (
           <Link
             key={unit.id}
-            to={`/prison/${prison.id}/unit/${unit.id}`}
+            to={unit.id.endsWith('-isu') ? `/prison/${prison.id}/isu` : `/prison/${prison.id}/unit/${unit.id}`}
             className="group bg-white/60 backdrop-blur-sm border border-slate-200 rounded-xl p-4 hover:bg-corrections-blue-pale hover:border-corrections-blue/30 transition-all duration-200 shadow-sm"
           >
             <div className="flex items-center justify-between">

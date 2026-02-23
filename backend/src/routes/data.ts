@@ -10,6 +10,11 @@ import { PrisonerInduction } from '../entity/PrisonerInduction';
 import { StripSearch } from '../entity/StripSearch';
 import { UnitConfig } from '../entity/UnitConfig';
 import { PrisonBriefing } from '../entity/PrisonBriefing';
+import { Notification } from '../entity/Notification';
+import { SacraReminder } from '../entity/SacraReminder';
+import { ControlHandover } from '../entity/ControlHandover';
+import { IsuObservation } from '../entity/IsuObservation';
+import { AuditRecord } from '../entity/AuditRecord';
 import { broadcastUpdate } from '../ws';
 import { getDataSource } from '../db';
 
@@ -756,6 +761,224 @@ router.post('/briefing', async (req, res: Response) => {
   } catch (error) {
     console.error('Error saving briefing:', error);
     res.status(500).json({ error: 'Failed to save briefing' });
+  }
+});
+
+// ==================== NOTIFICATIONS ====================
+
+router.get('/notifications', async (_req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(Notification);
+    const notifications = await repo.find({ order: { timestamp: 'DESC' }, take: 50 });
+    res.json(notifications);
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+router.post('/notifications', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(Notification);
+    const notification = repo.create(req.body);
+    await repo.save(notification);
+    res.status(201).json(notification);
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    res.status(500).json({ error: 'Failed to create notification' });
+  }
+});
+
+router.put('/notifications/:id/dismiss', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(Notification);
+    const notification = await repo.findOneBy({ id: req.params.id });
+    if (!notification) {
+      res.status(404).json({ error: 'Notification not found' });
+      return;
+    }
+    notification.dismissed = true;
+    await repo.save(notification);
+    res.json(notification);
+  } catch (error) {
+    console.error('Error dismissing notification:', error);
+    res.status(500).json({ error: 'Failed to dismiss notification' });
+  }
+});
+
+router.delete('/notifications', async (_req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(Notification);
+    await repo.clear();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error clearing notifications:', error);
+    res.status(500).json({ error: 'Failed to clear notifications' });
+  }
+});
+
+// ==================== SACRA REMINDERS ====================
+
+router.get('/sacra-reminders', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(SacraReminder);
+    const { unitId } = req.query;
+    const where: any = {};
+    if (unitId) where.unitId = unitId as string;
+    const reminders = await repo.find({ where, order: { createdAt: 'DESC' } });
+    res.json(reminders);
+  } catch (error) {
+    console.error('Error fetching sacra reminders:', error);
+    res.status(500).json({ error: 'Failed to fetch sacra reminders' });
+  }
+});
+
+router.post('/sacra-reminders', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(SacraReminder);
+    const reminder = repo.create(req.body);
+    await repo.save(reminder);
+    res.status(201).json(reminder);
+  } catch (error) {
+    console.error('Error creating sacra reminder:', error);
+    res.status(500).json({ error: 'Failed to create sacra reminder' });
+  }
+});
+
+router.put('/sacra-reminders/:id/dismiss', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(SacraReminder);
+    const reminder = await repo.findOneBy({ id: req.params.id });
+    if (!reminder) {
+      res.status(404).json({ error: 'Reminder not found' });
+      return;
+    }
+    reminder.dismissed = true;
+    await repo.save(reminder);
+    res.json(reminder);
+  } catch (error) {
+    console.error('Error dismissing sacra reminder:', error);
+    res.status(500).json({ error: 'Failed to dismiss sacra reminder' });
+  }
+});
+
+router.put('/sacra-reminders/dismiss-all', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(SacraReminder);
+    const { unitId } = req.body;
+    const where: any = { unitId };
+    await repo.update(where, { dismissed: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error dismissing all sacra reminders:', error);
+    res.status(500).json({ error: 'Failed to dismiss all sacra reminders' });
+  }
+});
+
+// ==================== CONTROL HANDOVER ====================
+
+router.get('/control-handover', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(ControlHandover);
+    const { date } = req.query;
+    if (date) {
+      const handover = await repo.findOneBy({ date: date as string });
+      res.json(handover || { date });
+    } else {
+      const handovers = await repo.find();
+      res.json(handovers);
+    }
+  } catch (error) {
+    console.error('Error fetching control handover:', error);
+    res.status(500).json({ error: 'Failed to fetch control handover' });
+  }
+});
+
+router.post('/control-handover', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(ControlHandover);
+    const { date } = req.body;
+    const existing = await repo.findOneBy({ date });
+    if (existing) {
+      Object.assign(existing, req.body);
+      await repo.save(existing);
+      res.json(existing);
+    } else {
+      const handover = repo.create(req.body);
+      await repo.save(handover);
+      res.status(201).json(handover);
+    }
+  } catch (error) {
+    console.error('Error saving control handover:', error);
+    res.status(500).json({ error: 'Failed to save control handover' });
+  }
+});
+
+// ==================== ISU OBSERVATIONS ====================
+
+router.get('/isu-observations', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(IsuObservation);
+    const { unitId, prisonerId } = req.query;
+    const where: any = {};
+    if (unitId) where.unitId = unitId as string;
+    if (prisonerId) where.prisonerId = prisonerId as string;
+    const observations = await repo.find({ where, order: { recordedAt: 'DESC' } });
+    res.json(observations);
+  } catch (error) {
+    console.error('Error fetching ISU observations:', error);
+    res.status(500).json({ error: 'Failed to fetch ISU observations' });
+  }
+});
+
+router.post('/isu-observations', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(IsuObservation);
+    const observation = repo.create(req.body);
+    await repo.save(observation);
+    broadcastChange();
+    res.status(201).json(observation);
+  } catch (error) {
+    console.error('Error creating ISU observation:', error);
+    res.status(500).json({ error: 'Failed to create ISU observation' });
+  }
+});
+
+router.delete('/isu-observations/:id', async (req, res: Response) => {
+  try {
+    const ds = getDataSource();
+    if (!ds.isInitialized) await ds.initialize();
+    const repo = ds.getRepository(IsuObservation);
+    await repo.delete(req.params.id);
+    broadcastChange();
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting ISU observation:', error);
+    res.status(500).json({ error: 'Failed to delete ISU observation' });
   }
 });
 

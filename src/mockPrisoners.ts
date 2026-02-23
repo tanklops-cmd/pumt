@@ -1,4 +1,4 @@
-import type { Prisoner, UnitId, SecurityClassification, LocationCode } from './types'
+import type { Prisoner, UnitId, SecurityClassification, LocationCode, PrisonerCategory } from './types'
 
 const FIRST_NAMES = [
   'James', 'John', 'Michael', 'David', 'Daniel', 'Matthew', 'Christopher', 'Andrew', 'Joshua', 'William',
@@ -18,6 +18,9 @@ const SURNAMES = [
 
 const SECURITY_OPTIONS: SecurityClassification[] = ['UNCLASS', 'L1', 'L2', 'MIN', 'LOW', 'L/MED', 'MED', 'HIGH', 'MAX']
 const SECURITY_WEIGHTS = [2, 5, 8, 10, 15, 20, 25, 10, 5]
+
+const PRISONER_CATEGORIES: PrisonerCategory[] = ['RMD/ACC', 'RMD/CONV', 'CONV', 'RECALL']
+const CATEGORY_WEIGHTS = [15, 10, 60, 15] // Most are CONV
 
 const JOBS = ['', 'Grounds', 'Horticulture', 'Kitchen', 'Wing Orderly', 'Laundry', 'Sewing Room', 'Workshop', 'Painting'] as const
 const JOB_WEIGHTS = [25, 12, 15, 10, 8, 10, 8, 6, 6]
@@ -39,6 +42,14 @@ const NOTES_OPTIONS = [
   'Allergic to penicillin',
   'Epilepsy - seizure risk',
   'Hearing impaired',
+]
+
+const INDUCTION_DOCUMENTS = [
+  'Induction_Complete_2024.pdf',
+  'Induction_Handbook_2024.pdf',
+  'Safety_Briefing.pdf',
+  'Health_Assessment.pdf',
+  '',
 ]
 
 function pick<T>(arr: T[], weights?: number[]): T {
@@ -136,6 +147,9 @@ export function generateMockPrisoners(): Prisoner[] {
       const ccs = specialCategory === 'CC'
       const ntdb = specialCategory === 'NTDB'
 
+      // Randomly set protection status (5% chance)
+      const protection = Math.random() < 0.05
+
       // Location: up to 10 at workplace, 2-3 at court/medical
       let location: LocationCode
       if (i < 10 && Math.random() < 0.15) {
@@ -161,6 +175,27 @@ export function generateMockPrisoners(): Prisoner[] {
         locationHistory.push({ location: prevLoc, from, to })
       }
 
+      // Induction status - 70% fully inducted, 15% pending jobs, 10% pending laundry, 5% not inducted
+      const inductionRoll = Math.random()
+      let laundryNumberAdded = inductionRoll > 0.15
+      let addedToJobsList = inductionRoll > 0.25
+      let sacraCompleted = inductionRoll > 0.30
+      const inductionDocumentName = sacraCompleted ? pick(INDUCTION_DOCUMENTS) : undefined
+
+      // Meal status - random for each meal when in cell
+      const mealBreakfast = location === 'CELL' ? Math.random() < 0.85 : false
+      const mealLunch = location === 'CELL' ? Math.random() < 0.80 : false
+      const mealDinner = location === 'CELL' ? Math.random() < 0.75 : false
+
+      // PCO notification - 80% notified for inducted prisoners
+      const pcoNotified = laundryNumberAdded && addedToJobsList && Math.random() < 0.80
+
+      // Move notification - 10% newly arrived
+      const moveToUnitNotified = Math.random() < 0.90
+
+      // Prisoner category
+      const category = pick(PRISONER_CATEGORIES, CATEGORY_WEIGHTS)
+
       prisoners.push({
         id: `mock-${unitId}-${idx}`,
         name,
@@ -174,6 +209,17 @@ export function generateMockPrisoners(): Prisoner[] {
         location,
         locationHistory,
         unitId,
+        category,
+        laundryNumberAdded,
+        addedToJobsList,
+        sacraCompleted,
+        inductionDocumentName,
+        mealBreakfast,
+        mealLunch,
+        mealDinner,
+        pcoNotified,
+        moveToUnitNotified,
+        protection,
       })
       idx++
     }
